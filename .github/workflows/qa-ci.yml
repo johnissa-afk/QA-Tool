@@ -1,0 +1,246 @@
+# ---------------------------------------------------------------------------
+# Phase 11D — QA CI integration.
+#
+# Phase 11A — QA CI contract (canonical command).
+#
+# Runs the canonical QA gate command:
+#
+#   npm run qa -- <url> --execute --ci --baseline <baseline-path> [--baseline-max-age <duration>]
+#
+# The command's own exit code drives the job result — it is NOT masked or
+# converted:
+#
+#   0  QA completed; no regression/gate/policy violation           -> pass
+#   1  QA completed; regression/gate/policy violation              -> fail
+#   2  baseline verification/integrity failure or infrastructure   -> fail
+#
+# The baseline is resolved in this order:
+#   1. inputs.baseline            — an explicit path (must exist)
+#   2. inputs.baseline-artifact   — an artifact from a previous successful run,
+#                                   resolved to a run id via the Actions API
+#                                   (see the "Resolve the baseline run id" step)
+#   3. .qa-baseline/*.json        — a committed or downloaded artifact
+#   4. nothing                    — the gate runs inactive and a warning is
+#                                   printed, unless inputs.require-baseline
+#                                   turns it into a hard failure
+# Set inputs.publish-baseline to emit a qa-baseline artifact for the next run.
+# Keep the secrets below (Noor basic-auth + optional AI) in the repository
+# settings.
+# ---------------------------------------------------------------------------
+name: QA CI
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: QA target URL (required)
+        required: true
+        type: string
+      baseline:
+        description: Baseline artifact path (defaults to baseline.path in qa.config.json)
+        required: false
+        type: string
+        default: ""
+      baseline-max-age:
+        description: Rotation policy duration, e.g. 30d / 12h
+        required: false
+        type: string
+        default: ""
+      baseline-artifact:
+        description: >-
+          Name of a qa-baseline artifact from a previous successful run to
+          download and gate against. Leave empty to use the committed
+          .qa-baseline/ artifact.
+        required: false
+        type: string
+        default: ""
+      baseline-run-id:
+        description: >-
+          Workflow run id to download baseline-artifact from. Leave empty to
+          use the most recent successful run of this workflow.
+        required: false
+        type: string
+        default: ""
+      require-baseline:
+        description: >-
+          Fail the job when no baseline is available, instead of letting the
+          gate run inactive. Recommended once a baseline is published.
+        required: false
+        type: boolean
+        default: false
+      publish-baseline:
+        description: >-
+          On success, publish this run as a qa-baseline artifact for the next
+          run to gate against.
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  # actions: read is required to list previous runs and download their
+  # artifacts via the API. Without it the token is scoped to contents only and
+  # the baseline lookup fails with 403.
+  actions: read
+
+jobs:
+  qa:
+    name: QA gate
+    runs-on: ubuntu-latest
+    env:
+      # Noor basic-auth — same variables the scanner/executor read locally from .env
+      QA_USERNAME: ${{ secrets.QA_USERNAME }}
+      QA_PASSWORD: ${{ secrets.QA_PASSWORD }}
+      QA_BASIC_AUTH_USER: ${{ secrets.QA_BASIC_AUTH_USER }}
+      QA_BASIC_AUTH_PASSWORD: ${{ secrets.QA_BASIC_AUTH_PASSWORD }}
+      QA_AUTHORIZATION: ${{ secrets.QA_AUTHORIZATION }}
+      # Optional AI enhancement; empty means deterministic mode
+      AI_API_KEY: ${{ secrets.AI_API_KEY }}
+      AI_API_URL: ${{ secrets.AI_API_URL }}
+      AI_MODEL: ${{ secrets.AI_MODEL }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium (Playwright)
+        run: npx playwright install --with-deps chromium
+
+      - name: Build the QA engine
+        run: npm run build
+
+      - name: Run the unit test suite
+        run: npm test
+
+      # actions/download-artifact only searches the CURRENT run by default, so a
+      # cross-run baseline has to be resolved to an explicit run id first. The
+      # newest successful run is used unless the caller pins baseline-run-id, so
+      # a broken run can never become the next baseline.
+      - name: Resolve the baseline run id
+        if: ${{ inputs.baseline-artifact != '' }}
+        id: baseline-run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QA_BASELINE_RUN_ID: ${{ inputs.baseline-run-id }}
+          QA_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -o pipefail
+          if [ -n "$QA_BASELINE_RUN_ID" ]; then
+            run_id="$QA_BASELINE_RUN_ID"
+          else
+            # workflow_id takes the workflow FILE name; the display name may
+            # contain spaces. GITHUB_WORKFLOW_REF is "owner/repo/.github/workflows/<file>@<ref>".
+            workflow_file="${GITHUB_WORKFLOW_REF%%@*}"
+            workflow_file="${workflow_file##*/}"
+            run_id=$(gh api \
+              "repos/$QA_REPOSITORY/actions/runs?workflow_id=$workflow_file&status=success&per_page=50" \
+              --jq "[.workflow_runs[] | select(.head_branch == \"$GITHUB_REF_NAME\" and .id != $GITHUB_RUN_ID)] | sort_by(.created_at) | last | .id // empty")
+          fi
+          if [ -z "$run_id" ]; then
+            echo "::error::No previous successful run found for artifact '${{ inputs.baseline-artifact }}'."
+            echo "Publish one first, or set the baseline-run-id input explicitly."
+            exit 1
+          fi
+          echo "Downloading '${{ inputs.baseline-artifact }}' from run $run_id."
+          echo "run-id=$run_id" >> "$GITHUB_OUTPUT"
+
+      - name: Download the baseline artifact from a previous run
+        if: ${{ inputs.baseline-artifact != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.baseline-artifact }}
+          path: .qa-baseline
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.baseline-run.outputs.run-id }}
+
+      - name: Check that a baseline is available
+        env:
+          QA_BASELINE: ${{ inputs.baseline }}
+          QA_BASELINE_ARTIFACT: ${{ inputs.baseline-artifact }}
+          QA_REQUIRE_BASELINE: ${{ inputs.require-baseline }}
+        run: |
+          set -o pipefail
+          if [ -n "$QA_BASELINE" ] && [ -f "$QA_BASELINE" ]; then
+            echo "Using the baseline input: $QA_BASELINE"
+            exit 0
+          fi
+          if [ -n "$QA_BASELINE" ]; then
+            echo "::error::The requested baseline does not exist: $QA_BASELINE"
+            exit 1
+          fi
+          # No explicit path: fall back to the committed/downloaded artifact.
+          if compgen -G ".qa-baseline/*.json" > /dev/null; then
+            echo "Using a baseline from .qa-baseline/"
+            ls -1 .qa-baseline
+            exit 0
+          fi
+          if [ "$QA_REQUIRE_BASELINE" = "true" ]; then
+            echo "::error::No baseline is available and require-baseline is set."
+            echo "Publish one with: npm run qa -- ${{ inputs.target }} --execute --write-baseline .qa-baseline/qa-baseline.json"
+            exit 1
+          fi
+          echo "::warning::No baseline is available — the regression gate runs inactive."
+          echo "Publish one with: npm run qa -- ${{ inputs.target }} --execute --write-baseline .qa-baseline/qa-baseline.json"
+
+      - name: Run the canonical QA gate command
+        env:
+          QA_TARGET: ${{ inputs.target }}
+          QA_BASELINE: ${{ inputs.baseline }}
+          QA_MAX_AGE: ${{ inputs.baseline-max-age }}
+        run: |
+          set -o pipefail
+          args=("$QA_TARGET")
+          if [ -n "$QA_BASELINE" ] && [ -f "$QA_BASELINE" ]; then
+            args+=(--baseline "$QA_BASELINE")
+          elif compgen -G ".qa-baseline/*.json" > /dev/null; then
+            for candidate in .qa-baseline/*.json; do
+              case "$candidate" in
+                *.meta.json) continue ;;
+              esac
+              args+=(--baseline "$candidate")
+              break
+            done
+          fi
+          if [ -n "$QA_MAX_AGE" ]; then args+=(--baseline-max-age "$QA_MAX_AGE"); fi
+          npm run qa -- "${args[@]}" --execute --ci
+
+      - name: Upload QA reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-reports
+          path: |
+            reports/qa-analysis.json
+            reports/qa-analysis.html
+            reports/qa-execution.json
+            test-results/**
+            playwright-report/**
+          if-no-files-found: ignore
+
+      # Publish the run as a candidate baseline. Download it on the next run via
+      # the `baseline-artifact` input, or copy the artifact into .qa-baseline/
+      # and commit it. The baseline is only written when the run itself passed.
+      - name: Publish this run as a baseline candidate
+        if: ${{ success() && inputs.publish-baseline == 'true' }}
+        run: |
+          set -o pipefail
+          npm run qa -- "${{ inputs.target }}" --execute --write-baseline .qa-baseline/qa-baseline.json
+
+      - name: Upload the baseline candidate
+        if: ${{ success() && inputs.publish-baseline == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-baseline
+          path: |
+            .qa-baseline/qa-baseline.json
+            .qa-baseline/qa-baseline.json.meta.json
+          if-no-files-found: ignore
+          retention-days: 90

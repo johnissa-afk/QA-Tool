@@ -1,0 +1,38 @@
+{
+  "name": "ai-website-qa",
+  "version": "1.0.0",
+  "description": "A lightweight Playwright website smoke scanner",
+  "scripts": {
+    "scan": "tsx src/cli.ts",
+    "generate-tests": "tsx src/generate-cli.ts",
+    "generate": "tsx src/generate-cli.ts",
+    "qa": "tsx src/qa-cli.ts",
+    "dash": "tsx src/qa-cli.ts serve",
+    "serve": "tsx src/qa-cli.ts serve",
+    "test:generated": "playwright test generated/generated-tests.spec.ts --reporter=line",
+    "report": "tsx src/report-cli.ts",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --test \"dist/tests/*.test.js\"",
+    "test:email-ui": "tsx tools/email-settings-browser.ts",
+    "test:notification-email": "tsx tools/notification-email-browser.ts"
+  },
+  "keywords": [
+    "playwright",
+    "qa",
+    "accessibility",
+    "website-scanner"
+  ],
+  "type": "commonjs",
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.5.1",
+    "playwright": "^1.63.0",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "nodemailer": "^10.0.13"
+  }
+}

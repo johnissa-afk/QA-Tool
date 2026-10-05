@@ -1,0 +1,730 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI Website QA</title>
+<style>
+  :root {
+    --bg: #0f1117; --panel: #171a23; --panel-2: #1d2130; --fg: #e6e9f0; --muted: #98a1b3;
+    --accent: #6ea8fe; --line: #2a3040; --ok: #3fb98a; --warn: #e0a83c; --fail: #e05d5d;
+    --info: #5dade2;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 ui-sans-serif, system-ui, "Segoe UI", sans-serif; }
+  header { padding: 20px 28px; border-bottom: 1px solid var(--line); background: linear-gradient(180deg, #141823, var(--bg)); }
+  header h1 { margin: 0; font-size: 20px; letter-spacing: .3px; }
+  header .meta { color: var(--muted); margin-top: 4px; font-size: 13px; }
+  main { max-width: 1080px; margin: 24px auto; padding: 0 20px 60px; }
+  .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-bottom: 20px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .card h2 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); }
+  .card .big { font-size: 26px; font-weight: 600; }
+  .card .sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .chip { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; margin: 2px 4px 0 0; }
+  .chip.ok { background: rgba(63,185,138,.16); color: var(--ok); }
+  .chip.warn { background: rgba(224,168,60,.16); color: var(--warn); }
+  .chip.fail { background: rgba(224,93,93,.16); color: var(--fail); }
+  .chip.muted { background: var(--panel-2); color: var(--muted); }
+  .chip.info { background: rgba(93,162,226,.16); color: var(--info); }
+  .status { font-size: 15px; font-weight: 700; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: .6px; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .empty { color: var(--muted); padding: 14px 0; }
+  .bar { height: 8px; border-radius: 999px; background: var(--panel-2); overflow: hidden; margin-top: 6px; }
+  .bar > span { display: block; height: 100%; }
+  .lifecycle { margin-top: 8px; }
+  .footer { color: var(--muted); font-size: 12px; margin-top: 26px; border-top: 1px solid var(--line); padding-top: 14px; }
+  .err { color: var(--fail); }
+  .tools { display: flex; gap: 10px; flex-wrap: wrap; margin: 8px 0 14px; }
+  .input, .select { background: var(--panel-2); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; font: inherit; }
+  .input { min-width: 240px; }
+  .seg > h3 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); }
+  .kv dd { margin: 2px 0 6px; }
+  .kv dt { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: .5px; margin-top: 10px; }
+  code { background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; font-size: 12px; word-break: break-all; }
+  .occ { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; background: var(--panel-2); }
+  .occ h4 { margin: 0 0 2px; font-size: 13px; }
+  .occ .src { color: var(--muted); font-size: 11.5px; margin-bottom: 6px; }
+  .rc-card { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
+  .rc-card h4 { margin: 0 0 4px; font-size: 13.5px; }
+  .note { color: var(--muted); font-size: 12.5px; }
+  .note li { margin: 3px 0; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>AI Website QA</h1>
+  <div class="meta" id="header-meta">Loading…</div>
+</header>
+<main id="app">
+  <div class="empty">Reading report artifacts…</div>
+</main>
+<script>
+"use strict";
+
+const el = (tag, cls, text) => {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  if (text !== undefined) node.textContent = text;
+  return node;
+};
+
+const statusChip = (status) => {
+  const cls = status === "PASS" ? "chip ok" : status === "FAIL" ? "chip fail" : "chip warn";
+  return el("span", cls + " status", status ?? "—");
+};
+
+const card = (title) => {
+  const card = el("div", "card");
+  card.appendChild(el("h2", null, title));
+  return card;
+};
+
+// Phase 10D: compact age ("2d 4h 5m") for the baseline trust card.
+const formatAge = (ms) => {
+  const d = Math.floor(ms / 86400000);
+  const h = Math.floor((ms % 86400000) / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  return d > 0 ? `${d}d` : h > 0 ? `${h}h${m > 0 ? " " + m + "m" : ""}` : `${m}m`;
+};
+
+const severityCounts = (summary) => {
+  if (!summary) return [];
+  const order = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"];
+  return order
+    .filter((s) => (summary.bySeverity[s] ?? 0) > 0)
+    .map((s) => ({ s, n: summary.bySeverity[s] }));
+};
+
+function render(state) {
+  const { report, history, artifacts } = state;
+  document.getElementById("header-meta").textContent =
+    report
+      ? `${report.scan.scan.title} — ${report.scan.scan.url}`
+      : "No QA run has been generated yet in this report directory.";
+
+  const app = document.getElementById("app");
+  app.innerHTML = "";
+
+  if (!report) {
+    const empty = el("div", "empty");
+    empty.appendChild(el("p", null, "Run `npm run qa -- <url> --crawl --execute` to produce results here."));
+    app.appendChild(empty);
+    const footer = el("div", "footer");
+    footer.appendChild(el("span", null, `Report dir: ${artifacts.reportJson}`));
+    app.appendChild(footer);
+    return;
+  }
+
+  const summary = report.summary || {};
+  const coverage = report.coverage ? (report.coverage.summary || {}) : null;
+  const historical = report.historicalIntelligence || null;
+  const queue = historical && historical.investigationQueue
+    ? historical.investigationQueue
+    : (report.intelligence && report.intelligence.investigationQueue) || [];
+  const pages = coverage ? coverage.pages : null;
+  const historySites = (history.sites || []).slice();
+  historySites.sort((a, b) => b.runs.length - a.runs.length);
+  const coverageLabel = pages
+    ? (pages.tested > 0 && pages.partial === 0 ? "TESTED" : pages.tested > 0 || pages.partial > 0 ? "PARTIALLY_TESTED" : "NOT_TESTED")
+    : "N/A";
+
+  const row1 = el("div", "row");
+
+  const cStatus = card("Status");
+  cStatus.appendChild(statusChip(summary.overallStatus));
+  row1.appendChild(cStatus);
+
+  const cFindings = card("Findings");
+  cFindings.appendChild(el("div", "big", String(summary.issueCount ?? 0)));
+  cFindings.appendChild(el("div", "sub", `${report.findings.length} issue group(s)`));
+  const sev = el("div", "lifecycle");
+  for (const { s, n } of severityCounts(summary)) {
+    const chip = el("span", "chip " + (s === "CRITICAL" ? "fail" : s === "HIGH" ? "warn" : "info"), `${s} ${n}`);
+    sev.appendChild(chip);
+  }
+  cFindings.appendChild(sev);
+  const currentRunId = report.history ? report.history.currentRunId : null;
+  if (currentRunId) {
+    const explore = link(String(currentRunId === null ? "" : "Open evidence explorer →"), `#/runs/${encodeURIComponent(currentRunId)}/findings`, "Browse this run's findings and their evidence");
+    explore.style.fontSize = "12px";
+    cFindings.appendChild(explore);
+  }
+  row1.appendChild(cFindings);
+
+  const cVerify = card("Verification");
+  cVerify.appendChild(el("div", "big", `${summary.verified ?? 0}/${summary.scheduled ?? 0}`));
+  cVerify.appendChild(el("div", "sub", `${summary.reproduced ?? 0} reproduced · ${summary.pass ?? 0} passed · ${summary.unverified ?? 0} unverified`));
+  row1.appendChild(cVerify);
+
+  const cCoverage = card("Coverage");
+  cCoverage.appendChild(el("div", "big", pages ? `${pages.tested}/${pages.discovered}` : "—"));
+  cCoverage.appendChild(el("div", "sub", coverageLabel + (coverage ? ` · ${coverage.items} item(s)` : "")));
+  if (pages && pages.discovered > 0) {
+    const bar = el("div", "bar");
+    const fill = el("span", null);
+    fill.style.width = `${Math.round((pages.tested / pages.discovered) * 100)}%`;
+    fill.style.background = "var(--ok)";
+    bar.appendChild(fill);
+    cCoverage.appendChild(bar);
+  }
+  row1.appendChild(cCoverage);
+
+  const cRegression = card("Regression");
+  const regression = report.regression;
+  const baselineVerification = state.baselineVerification;
+  const changeCount = regression ? (regression.summary.changeCount ?? 0) : null;
+  cRegression.appendChild(el("div", "big", regression ? String(changeCount) : "—"));
+  cRegression.appendChild(el("div", "sub", baselineVerification && !baselineVerification.ok
+    ? "baseline untrusted"
+    : regression ? (regression.summary.comparable ? "change(s) vs baseline" : "not comparable") : "not run (add --baseline)"));
+  row1.appendChild(cRegression);
+
+  const cGate = card("CI gate");
+  const gateEnabled = state.gate && state.gate.enabled;
+  cGate.appendChild(el("div", "big", gateEnabled ? (state.gate.failed ? "FAIL" : "OK") : "—"));
+  cGate.appendChild(el("div", "sub", gateEnabled
+    ? `${state.gate.violations.length} violation(s) · NEW ≥ ${state.gate.minSeverity}`
+    : (baselineVerification && !baselineVerification.ok ? "suppressed — baseline verification failed; gate disabled until trusted"
+    : (state.gate ? "inactive — no baseline comparison (add --baseline)" : "n/a"))));
+  row1.appendChild(cGate);
+
+  if (baselineVerification) {
+    const cBaseline = card("Baseline trust");
+    cBaseline.appendChild(el("div", "big", baselineVerification.ok ? (baselineVerification.integrity === "VERIFIED" ? "VERIFIED" : "LEGACY") : "FAIL"));
+    let sub = baselineVerification.ok
+      ? `${baselineVerification.provenance?.runId ?? "no run id"} · generated ${baselineVerification.provenance?.generatedAt ?? "unknown"}`
+      : (baselineVerification.error || "baseline could not be verified");
+    if (baselineVerification.age) {
+      sub += ` · age ${formatAge(baselineVerification.age.ms)} from ${baselineVerification.age.source}`;
+    }
+    if (baselineVerification.staleness) {
+      sub += baselineVerification.staleness === "STALE"
+        ? ` · STALE (exceeds ${state.baselineMaxAge ?? "the"} rotation policy)`
+        : baselineVerification.staleness === "FRESH" ? " · fresh" : " · rotation unknown";
+    }
+    cBaseline.appendChild(el("div", "sub", sub));
+    row1.appendChild(cBaseline);
+  }
+
+  if (baselineVerification && !baselineVerification.ok) {
+    const banner = el("div", "card");
+    banner.style.borderColor = "rgba(224,93,93,.65)";
+    banner.style.background = "rgba(224,93,93,.08)";
+    banner.appendChild(el("h2", null, "Baseline trust warning"));
+    banner.appendChild(el("div", "status", "Gate suppressed — baselines must verify before regression gating is trusted."));
+    if (baselineVerification.error) {
+      banner.appendChild(el("div", "sub", baselineVerification.error));
+    }
+    app.appendChild(banner);
+  }
+
+  const cHistory = card("History");
+  const totalRuns = historySites.reduce((total, site) => total + site.runs.length, 0);
+  cHistory.appendChild(el("div", "big", String(totalRuns)));
+  cHistory.appendChild(el("div", "sub", `runs stored · historical: ${historical ? historical.status : "n/a"}`));
+  row1.appendChild(cHistory);
+
+  app.appendChild(row1);
+
+  const row2 = el("div", "row");
+  const qCard = card("Investigation queue");
+  const qCounts = { P1: 0, P2: 0, P3: 0 };
+  for (const entry of queue) if (qCounts[entry.priority] !== undefined) qCounts[entry.priority] += 1;
+  qCard.appendChild(el("div", "big", String(queue.length)));
+  const qChips = el("div", "lifecycle");
+  for (const p of ["P1", "P2", "P3"]) qChips.appendChild(el("span", "chip " + (p === "P1" ? "fail" : p === "P2" ? "warn" : "info"), `${p}: ${qCounts[p]}`));
+  qCard.appendChild(qChips);
+  row2.appendChild(qCard);
+
+  const tCard = card("Historical intelligence");
+  if (historical) {
+    const hs = historical.summary;
+    const fl = hs.findings;
+    tCard.appendChild(el("div", "sub", `${fl.observed} finding(s) tracked across ${hs.orderedRuns} ordered run(s)`));
+    const lc = el("div", "lifecycle");
+    const labels = [["new", fl.new], ["persisting", fl.persisting], ["disappeared", fl.disappeared], ["reappeared", fl.reappeared], ["recurring", fl.recurring], ["unchanged", fl.unchanged], ["review required", fl.reviewRequired], ["insufficient evidence", fl.insufficientEvidence]];
+    for (const [label, n] of labels) {
+      if (n > 0) lc.appendChild(el("span", "chip muted", `${label} ${n}`));
+    }
+    tCard.appendChild(lc);
+  } else {
+    tCard.appendChild(el("div", "sub", "not available yet — needs 2+ persisted runs"));
+  }
+  row2.appendChild(tCard);
+  app.appendChild(row2);
+
+  const queueCard = el("div", "card");
+  queueCard.appendChild(el("h2", null, `Investigation queue (${queue.length})`));
+  if (queue.length === 0) {
+    queueCard.appendChild(el("div", "empty", "No evidence-backed investigation entries."));
+  } else {
+    const table = el("table");
+    const thead = el("thead");
+    const headRow = el("tr");
+    headRow.appendChild(el("th", null, "Priority"));
+    headRow.appendChild(el("th", null, "Item"));
+    headRow.appendChild(el("th", null, "Why"));
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+    const tbody = el("tbody");
+    for (const entry of queue.slice(0, 40)) {
+      const tr = el("tr");
+      const tdP = el("td");
+      tdP.appendChild(el("span", "chip " + (entry.priority === "P1" ? "fail" : entry.priority === "P2" ? "warn" : "info"), entry.priority));
+      tr.appendChild(tdP);
+      tr.appendChild(el("td", null, entry.title));
+      tr.appendChild(el("td", null, entry.priorityReason));
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    queueCard.appendChild(table);
+  }
+  app.appendChild(queueCard);
+
+  const trends = el("div", "card");
+  trends.appendChild(el("h2", null, "Runs"));
+  if (historySites.length === 0) {
+    trends.appendChild(el("div", "empty", "No persisted runs yet."));
+  } else {
+    const table = el("table");
+    const thead = el("thead");
+    const headRow = el("tr");
+    for (const h of ["Run", "Completed", "Findings", "Reproduced", "Infra", "Digest"]) headRow.appendChild(el("th", null, h));
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+    const tbody = el("tbody");
+    const site = historySites[0];
+    const runs = [...(site.runs || [])].reverse();
+    for (const run of runs) {
+      const tr = el("tr");
+      const tdRun = el("td");
+      const runLink = link(run.runId.slice(0, 19) + "…", `#/runs/${encodeURIComponent(run.runId)}/findings`, `Evidence explorer for ${run.runId}`);
+      runLink.title = run.runId;
+      tdRun.appendChild(runLink);
+      tdRun.appendChild(el("span", "note", " "));
+      const rawLink = link("raw", `/api/runs/${encodeURIComponent(run.runId)}`, "Raw archived run artifact");
+      rawLink.style.fontSize = "11px";
+      rawLink.title = run.runId;
+      tdRun.appendChild(rawLink);
+      tr.appendChild(tdRun);
+      tr.appendChild(el("td", null, (run.completedAt || "").replace("T", " ").slice(0, 16)));
+      tr.appendChild(el("td", null, String(run.findingCount ?? "—")));
+      tr.appendChild(el("td", null, String(run.executionReproduced ?? "—")));
+      tr.appendChild(el("td", null, String(run.executionInfraProblems ?? "—")));
+      tr.appendChild(el("td", null, (run.identityDigest || "").slice(0, 8)));
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    trends.appendChild(table);
+  }
+  app.appendChild(trends);
+
+  const footer = el("div", "footer");
+  footer.appendChild(el("span", null, `JSON: `));
+  const jsonLink = el("a", null, artifacts.reportJson);
+  jsonLink.href = "/api/report";
+  footer.appendChild(jsonLink);
+  footer.appendChild(el("span", null, " · "));
+  const htmlLink = el("a", null, artifacts.reportHtml);
+  htmlLink.href = "/report.html";
+  footer.appendChild(htmlLink);
+  footer.appendChild(el("span", null, ` · history: ${artifacts.historyDir}`));
+  app.appendChild(footer);
+}
+
+const link = (text, href, title) => {
+  const a = el("a", null, text);
+  a.href = href;
+  if (title) a.title = title;
+  return a;
+};
+
+const fetchJson = (url) =>
+  fetch(url)
+    .then((res) => res.json().then((json) => ({ status: res.status, ok: res.ok, json })).catch(() => ({ status: res.status, ok: false, json: null })));
+
+const severityChip = (s) => el("span", "chip " + (s === "CRITICAL" || s === "HIGH" ? "fail" : s === "MEDIUM" ? "warn" : s === "LOW" ? "info" : "muted"), s || "—");
+
+const chipsFor = (pairs) => {
+  const box = el("div", "lifecycle");
+  for (const pair of pairs) {
+    if (!pair) continue;
+    box.appendChild(el("span", "chip " + (pair[1] || "muted"), String(pair[0])));
+  }
+  return box;
+};
+
+const setApp = (nodes) => {
+  const app = document.getElementById("app");
+  app.innerHTML = "";
+  for (const node of nodes) app.appendChild(node);
+};
+
+const flatRuns = (sites) => {
+  const runs = [];
+  for (const site of (sites || [])) for (const run of (site.runs || [])) runs.push(run);
+  return runs.sort((a, b) => String(b.completedAt || b.startedAt || "").localeCompare(String(a.completedAt || a.startedAt || "")));
+};
+
+let historySites = [];
+
+const runSwitch = (currentRunId) => {
+  const select = el("select", "select");
+  select.appendChild(el("option", null, "Switch run…"));
+  for (const run of flatRuns(historySites)) {
+    const opt = el("option", null, `${run.runId.slice(0, 26)} · ${(run.completedAt || "").replace("T", " ").slice(0, 16)}`);
+    opt.value = run.runId;
+    select.appendChild(opt);
+  }
+  select.value = currentRunId;
+  select.addEventListener("change", () => { if (select.value) location.hash = `/runs/${encodeURIComponent(select.value)}/findings`; });
+  return select;
+};
+
+const evidenceRows = (rows) => {
+  const dl = el("dl", "kv");
+  for (const [label, value] of rows) {
+    dl.appendChild(el("dt", null, label));
+    dl.appendChild(el("dd", null, value));
+  }
+  return dl;
+};
+
+const bootError = (message) => {
+  document.getElementById("header-meta").textContent = "Could not load report artifacts.";
+  const app = document.getElementById("app");
+  app.innerHTML = "";
+  const err = el("div", "err");
+  err.appendChild(el("p", null, message));
+  app.appendChild(err);
+};
+
+function renderFindingsList(route) {
+  const { runId, query } = route;
+  const active = new URLSearchParams(query);
+  const shell = el("div", null);
+  shell.appendChild(link("← Dashboard", "#/"));
+  const panel = el("div", "card");
+  panel.appendChild(el("h2", null, `Findings — run ${runId}`));
+  const input = el("input", "input");
+  input.placeholder = "Search findings…";
+  input.value = active.get("q") || "";
+  const sevSel = el("select", "select");
+  sevSel.appendChild(el("option", null, "any severity"));
+  for (const s of ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]) sevSel.appendChild(el("option", null, s));
+  sevSel.value = (active.get("severity") || "").toUpperCase();
+  const go = () => {
+    const params = new URLSearchParams();
+    if (input.value.trim()) params.set("q", input.value.trim());
+    if (sevSel.value) params.set("severity", sevSel.value);
+    const qs = params.toString();
+    location.hash = `/runs/${encodeURIComponent(runId)}/findings${qs ? "?" + qs : ""}`;
+  };
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+  sevSel.addEventListener("change", go);
+  const tools = el("div", "tools");
+  tools.appendChild(input);
+  tools.appendChild(sevSel);
+  panel.appendChild(tools);
+  panel.appendChild(el("div", "sub", "Loading findings…"));
+  const body = el("div", null);
+  setApp([shell, panel, body]);
+
+  const listUrl = `/api/runs/${encodeURIComponent(runId)}/findings${query ? "?" + query : ""}`;
+  fetchJson(listUrl).then(({ status, json }) => {
+    body.innerHTML = "";
+    if (!json || json.ok === false) {
+      body.appendChild(el("div", "err", (json && json.error) ? json.error : `findings endpoint returned ${status}`));
+      return;
+    }
+    const run = json.run;
+    document.getElementById("header-meta").textContent = `${run.siteIdentity || run.scannedUrl || run.runId} — run ${run.runId} · ${run.sourceLabel}`;
+    panel.querySelector("h2").textContent = `Findings — run ${run.runId}`;
+    panel.appendChild(el("div", "sub", `${run.sourceLabel} · ${run.findingCount} finding(s) in artifact · ${json.total} shown`));
+    panel.appendChild(runSwitch(run.runId));
+    if (json.findings.length === 0) {
+      body.appendChild(el("div", "empty", "No findings" + (query ? " match the filters" : " in this run") + "."));
+      return;
+    }
+    const table = el("table");
+    const thead = el("thead");
+    const headRow = el("tr");
+    for (const h of ["Finding", "Severity", "Status", "Domain", "Lifecycle", "Occurrences", "Verification", "RC"]) headRow.appendChild(el("th", null, h));
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+    const tbody = el("tbody");
+    for (const f of json.findings) {
+      const tr = el("tr");
+      const tdFind = el("td");
+      tdFind.appendChild(link(`${f.id} — ${f.title}`, `#/runs/${encodeURIComponent(runId)}/findings/${encodeURIComponent(f.id)}`, f.title));
+      if (f.code) tdFind.appendChild(el("div", "sub", f.code));
+      if (f.verification) tdFind.appendChild(el("div", "sub", f.verification.disposition));
+      tr.appendChild(tdFind);
+      const tdSeverity = el("td"); tdSeverity.appendChild(severityChip(f.severity)); tr.appendChild(tdSeverity);
+      const tdStatus = el("td"); tdStatus.appendChild(el("span", "chip " + (f.status === "FAIL" ? "fail" : f.status === "WARNING" ? "warn" : "info"), f.status)); tr.appendChild(tdStatus);
+      tr.appendChild(el("td", null, f.domain));
+      tr.appendChild(el("td", null, f.lifecycle));
+      tr.appendChild(el("td", null, String(f.occurrenceCount)));
+      tr.appendChild(el("td", null, (f.verification && (f.verification.status || f.verification.verdict)) || "—"));
+      tr.appendChild(el("td", null, f.rootCause > 0 ? "yes" : "—"));
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    body.appendChild(table);
+    body.appendChild(el("div", "footer", ""));
+    body.lastChild.appendChild(el("span", null, "API: "));
+    body.lastChild.appendChild(link("findings list", `/api/runs/${encodeURIComponent(runId)}/findings${query ? "?" + query : ""}`, "Raw findings list JSON"));
+  });
+}
+
+function renderFindingDetail(route) {
+  const { runId, findingId } = route;
+  const url = `/api/runs/${encodeURIComponent(runId)}/findings/${encodeURIComponent(findingId)}`;
+  const shell = el("div", null);
+  shell.appendChild(link("← Back to findings", `#/runs/${encodeURIComponent(runId)}/findings`));
+  shell.appendChild(el("span", "note", " · "));
+  shell.appendChild(link("← Dashboard", "#/"));
+  const body = el("div", null);
+  body.appendChild(el("div", "sub", "Loading finding…"));
+  setApp([shell, body]);
+
+  fetchJson(url).then(({ status, json }) => {
+    body.innerHTML = "";
+    if (!json || json.ok === false) {
+      body.appendChild(el("div", "err", (json && json.error) ? json.error : `finding endpoint returned ${status}`));
+      return;
+    }
+    const f = json.finding;
+    document.getElementById("header-meta").textContent = `${json.run.siteIdentity || json.run.scannedUrl || json.run.runId} — ${f.title}`;
+
+    const head = el("div", "card seg");
+    head.appendChild(el("h2", null, f.title));
+    head.appendChild(chipsFor([
+      [f.severity, f.severity === "CRITICAL" || f.severity === "HIGH" ? "fail" : f.severity === "MEDIUM" ? "warn" : "info"],
+      ["status " + f.status, f.status === "FAIL" ? "fail" : f.status === "WARNING" ? "warn" : "info"],
+      ["confidence " + f.confidence, "muted"],
+      [f.domain, "info"],
+      ["lifecycle " + f.lifecycle, "muted"],
+    ]));
+    head.appendChild(el("div", "sub", `${f.id} · ${f.code}${f.page ? " · page " + f.page : ""} · ${f.occurrenceCount} occurrence(s) · source ${json.run.sourceLabel}`));
+    body.appendChild(head);
+
+    const desc = el("div", "card seg");
+    desc.appendChild(el("h3", null, "Description"));
+    const dl = el("dl", "kv");
+    dl.appendChild(el("dt", null, "Problem"));
+    dl.appendChild(el("dd", null, f.description || "—"));
+    if (f.recommendation) { dl.appendChild(el("dt", null, "Recommendation")); dl.appendChild(el("dd", null, f.recommendation)); }
+    if (f.userImpact) { dl.appendChild(el("dt", null, "User impact")); dl.appendChild(el("dd", null, f.userImpact)); }
+    if (f.rationale) { dl.appendChild(el("dt", null, "Rationale")); dl.appendChild(el("dd", null, f.rationale)); }
+    if (f.relatedScenarioIds && f.relatedScenarioIds.length) { dl.appendChild(el("dt", null, "Related scenarios")); dl.appendChild(el("dd", null, f.relatedScenarioIds.join(", "))); }
+    if (f.count != null) { dl.appendChild(el("dt", null, "Scanner count")); dl.appendChild(el("dd", null, String(f.count))); }
+    desc.appendChild(dl);
+    body.appendChild(desc);
+
+    const grid = el("div", "grid2");
+
+    const verifyCard = el("div", "card seg");
+    verifyCard.appendChild(el("h3", null, "Verification"));
+    if (json.verification) {
+      const v = json.verification;
+      verifyCard.appendChild(chipsFor([
+        [v.disposition, v.disposition === "REPRODUCED" ? "fail" : v.disposition === "PASSED" ? "ok" : v.disposition === "SCHEDULED" || v.disposition === "NOT_REPRODUCED" ? "warn" : "info"],
+      ]));
+      const vdl = el("dl", "kv");
+      const rows = [
+        ["Status", v.status], ["Category", v.category], ["Verdict", v.verdict],
+        ["Confidence", v.confidence], ["Reason", v.reason || "—"], ["Strategy", v.strategy],
+        ["Scenario", v.scenarioId], ["Locator", v.locator],
+        ["Executed at", v.executedAt], ["Duration (ms)", v.durationMs],
+      ];
+      for (const [label, value] of rows) {
+        if (value === null || value === undefined || value === "") continue;
+        vdl.appendChild(el("dt", null, label));
+        const dd = el("dd"); typeof value === "string" && value.length > 120 ? dd.appendChild(el("code", null, value)) : (dd.textContent = value); vdl.appendChild(dd);
+      }
+      if (v.error) { vdl.appendChild(el("dt", null, "Error")); vdl.appendChild(el("dd", null, `${v.error.type}: ${v.error.message}`)); }
+      for (const item of v.evidence) {
+        vdl.appendChild(el("dt", null, item.label));
+        const dd = el("dd"); dd.textContent = item.value; vdl.appendChild(dd);
+      }
+      verifyCard.appendChild(vdl);
+      verifyCard.appendChild(el("div", "note", "Verification evidence source: " + json.run.sourceLabel));
+    } else {
+      verifyCard.appendChild(el("div", "note", "No verification result exists in the artifact for this finding."));
+    }
+    grid.appendChild(verifyCard);
+
+    const histCard = el("div", "card seg");
+    histCard.appendChild(el("h3", null, "Historical record"));
+    if (json.history && json.history.available) {
+      const h = json.history;
+      histCard.appendChild(chipsFor([
+        [h.lifecycle, h.lifecycle === "PERSISTING" || h.lifecycle === "RECURRING" || h.lifecycle === "REAPPEARED" ? "fail" : "warn"],
+        ["confidence " + h.confidence, "muted"],
+      ]));
+      const hdl = el("dl", "kv");
+      const hrows = [
+        ["Semantic key", h.key], ["Page", h.page], ["Family", h.family],
+        ["Runs", h.runIds ? h.runIds.join(", ") : "—"],
+        ["Observed / absent", h.runsObserved != null ? `${h.runsObserved} / ${h.runsAbsent ?? 0}` : "—"],
+        ["First seen", h.firstSeenAt || h.firstSeenRunId || "—"],
+        ["Last seen", h.lastSeenAt || h.lastSeenRunId || "—"],
+        ["Latest disposition", h.latestDisposition], ["Latest verdict", h.latestVerdict],
+        ["Reproduced in", h.reproducedRunIds && h.reproducedRunIds.length ? h.reproducedRunIds.join(", ") : "—"],
+        ["Cleared in", h.clearedRunIds && h.clearedRunIds.length ? h.clearedRunIds.join(", ") : "—"],
+        ["Absent in", h.absentRunIds && h.absentRunIds.length ? h.absentRunIds.join(", ") : "—"],
+        ["Confidence reason", h.confidenceReason], ["Review note", h.reviewNote],
+      ];
+      for (const [label, value] of hrows) {
+        if (value === null || value === undefined || value === "") continue;
+        hdl.appendChild(el("dt", null, label));
+        hdl.appendChild(el("dd", null, value));
+      }
+      if (h.contradictions && h.contradictions.length) {
+        hdl.appendChild(el("dt", null, "Contradictions"));
+        const dd = el("dd");
+        dd.textContent = h.contradictions.map((c) => `${c.runId}: ${c.disposition}${c.verdict ? " / " + c.verdict : ""}${c.note ? " — " + c.note : ""}`).join("; ");
+        hdl.appendChild(dd);
+      }
+      histCard.appendChild(hdl);
+    } else {
+      histCard.appendChild(el("div", "note", (json.history && json.history.note) || "No historical record is included for this run's artifact."));
+    }
+    grid.appendChild(histCard);
+    body.appendChild(grid);
+
+    if (json.gate && json.gate.active) {
+      const gateCard = el("div", "card seg");
+      gateCard.appendChild(el("h3", null, "CI gate (baseline)"));
+      const g = json.gate;
+      if (g.violation) {
+        gateCard.appendChild(chipsFor([
+          [g.violation.classification, g.violation.classification === "REGRESSION" ? "fail" : "warn"],
+          [g.violation.classification + (g.violation.severity ? " · " + g.violation.severity : ""), g.violation.severity === "CRITICAL" || g.violation.severity === "HIGH" ? "fail" : "info"],
+        ]));
+        const gdl = el("dl", "kv");
+        gdl.appendChild(el("dt", null, "Why this fails the gate"));
+        gdl.appendChild(el("dd", null, g.violation.summary));
+        for (const item of g.violation.evidence) {
+          gdl.appendChild(el("dt", null, "Evidence"));
+          gdl.appendChild(el("dd", null, item));
+        }
+        if (g.violation.recommendedAction) {
+          gdl.appendChild(el("dt", null, "Recommended action"));
+          gdl.appendChild(el("dd", null, g.violation.recommendedAction));
+        }
+        gateCard.appendChild(gdl);
+      } else {
+        gateCard.appendChild(el("div", "note", `Not a gate violation (gate: find new findings ≥ ${g.minSeverity} or a verified finding regression).`));
+      }
+      body.appendChild(gateCard);
+    }
+
+    const occ = el("div", "card seg");
+    occ.appendChild(el("h3", null, `Occurrences (${json.occurrences.length})`));
+    if (json.occurrences.length === 0) {
+      occ.appendChild(el("div", "empty", "No recorded occurrences for this finding."));
+    } else {
+      for (const o of json.occurrences) {
+        const box = el("div", "occ");
+        const h4 = el("h4", null, `${o.id}`);
+        h4.appendChild(severityChip(o.kind));
+        box.appendChild(h4);
+        box.appendChild(el("div", "src", `Source: ${o.source}`));
+        const rows = [];
+        if (o.selector) rows.push(["Selector", o.selector]);
+        if (o.tag) rows.push(["Tag", o.tag]);
+        if (o.role) rows.push(["Role", o.role]);
+        if (o.accessibleName) rows.push(["Accessible name", o.accessibleName]);
+        if (o.href) rows.push(["Href", o.href]);
+        if (o.url) rows.push(["Url", o.url]);
+        if (o.text) rows.push(["Text", o.text]);
+        if (o.alt) rows.push(["Alt", o.alt]);
+        if (o.visible !== undefined) rows.push(["Visible", o.visible]);
+        for (const d of o.detail) rows.push([d.label, d.value]);
+        box.appendChild(evidenceRows(rows));
+        if (o.note) box.appendChild(el("div", "note", o.note));
+        occ.appendChild(box);
+      }
+    }
+    body.appendChild(occ);
+
+    const rc = el("div", "card seg");
+    rc.appendChild(el("h3", null, `Root-cause candidates (${json.rootCause.length})`));
+    if (json.rootCause.length === 0) {
+      rc.appendChild(el("div", "note", "This finding is not cited by any root-cause candidate in this artifact."));
+    } else {
+      for (const c of json.rootCause) {
+        const box = el("div", "rc-card");
+        box.appendChild(el("h4", null, c.title));
+        box.appendChild(chipsFor([
+          [c.pattern, "muted"],
+          [c.status, c.status === "ACTIONABLE" ? "fail" : c.status === "INVESTIGATION_REQUIRED" ? "warn" : "info"],
+          ["confidence " + c.confidence, "info"],
+          c.priority ? [c.priority, c.priority === "P1" ? "fail" : c.priority === "P2" ? "warn" : "info"] : null,
+        ]));
+        const dl = el("dl", "kv");
+        if (c.description) { dl.appendChild(el("dt", null, "Description")); dl.appendChild(el("dd", null, c.description)); }
+        if (c.confidenceReason) { dl.appendChild(el("dt", null, "Why this confidence")); dl.appendChild(el("dd", null, c.confidenceReason)); }
+        if (c.affectedPages && c.affectedPages.length) { dl.appendChild(el("dt", null, "Affected pages")); dl.appendChild(el("dd", null, c.affectedPages.join(", "))); }
+        if (c.priorityReason) { dl.appendChild(el("dt", null, "Priority reason")); dl.appendChild(el("dd", null, c.priorityReason)); }
+        box.appendChild(dl);
+        box.appendChild(el("div", "note", "Candidate " + c.candidateId));
+        rc.appendChild(box);
+      }
+    }
+    body.appendChild(rc);
+
+    if (json.notes && json.notes.length) {
+      const notesCard = el("div", "card seg");
+      notesCard.appendChild(el("h3", null, "Notes"));
+      const ul = el("ul", "note");
+      for (const note of json.notes) ul.appendChild(el("li", null, note));
+      notesCard.appendChild(ul);
+      body.appendChild(notesCard);
+    }
+
+    const foot = el("div", "footer");
+    foot.appendChild(el("span", null, "API: "));
+    foot.appendChild(link("finding detail", url, "Raw finding detail JSON"));
+    body.appendChild(foot);
+  });
+}
+
+const runRoute = () => {
+  const hash = (location.hash || "").replace(/^#/, "");
+  const [path, query = ""] = hash.split("?");
+  const detail = path.match(/^\/runs\/([^/]+)\/findings\/([^/]+)$/);
+  if (detail) return { view: "finding", runId: decodeURIComponent(detail[1]), findingId: decodeURIComponent(detail[2]), query };
+  const list = path.match(/^\/runs\/([^/]+)\/findings$/);
+  if (list) return { view: "findings", runId: decodeURIComponent(list[1]), query };
+  return { view: "dashboard" };
+};
+
+const renderRoute = () => {
+  const route = runRoute();
+  if (route.view === "findings") return renderFindingsList(route);
+  if (route.view === "finding") return renderFindingDetail(route);
+  document.getElementById("header-meta").textContent = "Loading…";
+  fetch("/api/state")
+    .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`state endpoint returned ${res.status}`))))
+    .then((state) => {
+      historySites = (state.history && state.history.sites) || [];
+      render(state);
+    })
+    .catch((error) => bootError(error && error.message ? error.message : String(error)));
+};
+
+window.addEventListener("hashchange", renderRoute);
+renderRoute();
+</script>
+</body>
+</html>

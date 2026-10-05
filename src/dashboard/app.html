@@ -1,0 +1,3018 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI Website QA</title>
+<style>
+  :root {
+    --bg: #0f1117; --panel: #171a23; --panel-2: #1d2130; --fg: #e6e9f0; --muted: #98a1b3;
+    --accent: #6ea8fe; --line: #2a3040; --ok: #3fb98a; --warn: #e0a83c; --fail: #e05d5d;
+    --info: #5dade2; --review: #b58cf0;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 ui-sans-serif, system-ui, "Segoe UI", sans-serif; }
+  header { padding: 20px 28px; border-bottom: 1px solid var(--line); background: linear-gradient(180deg, #141823, var(--bg)); }
+  header h1 { margin: 0; font-size: 20px; letter-spacing: .3px; }
+  header .sub { color: var(--muted); margin-top: 4px; font-size: 13.5px; }
+  main { max-width: 1180px; margin: 22px auto; padding: 0 20px 80px; }
+
+  /* Run form */
+  .runbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+  .field { flex: 1 1 340px; display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 12px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); font-weight: 600; }
+  .input { background: var(--panel-2); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font: inherit; width: 100%; }
+  .input:focus { outline: 2px solid rgba(110,168,254,.4); border-color: var(--accent); }
+  .btn { background: var(--accent); color: #0b1020; border: none; border-radius: 8px; padding: 10px 20px; font: inherit; font-weight: 700; cursor: pointer; }
+  .btn:disabled { opacity: .55; cursor: not-allowed; }
+  .btn.secondary { background: var(--panel-2); color: var(--fg); border: 1px solid var(--line); padding: 7px 13px; font-size: 13px; }
+  .btn.secondary:hover { border-color: var(--accent); }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 10px; }
+  .toast { display: none; margin-top: 12px; padding: 10px 14px; border-radius: 8px; font-size: 13px; }
+  .toast.show { display: block; }
+  .toast.error { background: rgba(224,93,93,.14); color: var(--fail); border: 1px solid rgba(224,93,93,.4); }
+
+  /* Cards */
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 16px; }
+  .card > h2 { margin: 0 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); display: flex; align-items: baseline; gap: 8px; }
+  .card > h2 .count { color: var(--fg); letter-spacing: 0; text-transform: none; font-size: 12px; }
+  .card .lede { color: var(--muted); font-size: 12.5px; margin: 0 0 12px; }
+  .section { scroll-margin-top: 14px; }
+
+  /* Status */
+  .verdict { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .status { font-size: 20px; font-weight: 700; letter-spacing: .5px; padding: 5px 14px; border-radius: 8px; }
+  .status-PASS { background: rgba(63,185,138,.16); color: var(--ok); }
+  .status-FAIL { background: rgba(224,93,93,.16); color: var(--fail); }
+  .status-REVIEW { background: rgba(224,168,60,.16); color: var(--warn); }
+  .status-BLOCKED { background: rgba(224,93,93,.12); color: #f08a8a; }
+  .status-NOT_TESTED { background: rgba(152,161,179,.16); color: var(--muted); }
+  .explanation { margin: 12px 0 0; font-size: 14.5px; max-width: 92ch; }
+  .headline { color: var(--muted); margin: 6px 0 0; font-size: 13.5px; }
+
+  /* Metric strip */
+  .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-top: 16px; }
+  .metric { background: var(--panel); padding: 12px 14px; }
+  .metric .v { font-size: 22px; font-weight: 600; line-height: 1.2; }
+  .metric .k { color: var(--muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: .5px; margin-top: 3px; }
+
+  /* Access banner */
+  .banner { border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; border: 1px solid; display: flex; gap: 14px; align-items: flex-start; }
+  .banner .ico { font-size: 20px; line-height: 1.2; }
+  .banner h3 { margin: 0 0 4px; font-size: 13px; letter-spacing: .6px; text-transform: uppercase; }
+  .banner p { margin: 0 0 6px; font-size: 13.5px; }
+  .banner .notdefect { font-size: 12.5px; opacity: .9; }
+  .banner.AUTHENTICATION_REQUIRED { background: rgba(224,168,60,.10); border-color: rgba(224,168,60,.45); }
+  .banner.AUTHENTICATION_REQUIRED h3 { color: var(--warn); }
+  .banner.BOT_PROTECTION { background: rgba(181,140,240,.10); border-color: rgba(181,140,240,.45); }
+  .banner.BOT_PROTECTION h3 { color: var(--review); }
+  .banner.ACCESS_BLOCKED { background: rgba(224,93,93,.10); border-color: rgba(224,93,93,.45); }
+  .banner.ACCESS_BLOCKED h3 { color: var(--fail); }
+  .banner.UNKNOWN { background: rgba(152,161,179,.10); border-color: rgba(152,161,179,.4); }
+  .banner.UNKNOWN h3 { color: var(--muted); }
+
+  /* Chips */
+  .chip { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; margin: 2px 4px 2px 0; white-space: nowrap; }
+  .chip.ok { background: rgba(63,185,138,.16); color: var(--ok); }
+  .chip.warn { background: rgba(224,168,60,.16); color: var(--warn); }
+  .chip.fail { background: rgba(224,93,93,.16); color: var(--fail); }
+  .chip.review { background: rgba(181,140,240,.16); color: var(--review); }
+  .chip.info { background: rgba(93,162,226,.16); color: var(--info); }
+  .chip.muted { background: var(--panel-2); color: var(--muted); }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; font-size: 12px; word-break: break-all; }
+
+  /* Section nav */
+  .nav { position: sticky; top: 0; z-index: 5; background: rgba(15,17,23,.94); backdrop-filter: blur(6px); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; margin-bottom: 16px; display: flex; gap: 4px; flex-wrap: wrap; }
+  .nav a { color: var(--muted); font-size: 12.5px; font-weight: 600; padding: 4px 10px; border-radius: 999px; border: 1px solid transparent; }
+  .nav a:hover { color: var(--fg); background: var(--panel-2); text-decoration: none; }
+
+  /* Columns / lists */
+  .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px; }
+  .list { list-style: none; margin: 0; padding: 0; }
+  .list li { padding: 7px 0; border-bottom: 1px solid var(--line); }
+  .list li:last-child { border-bottom: none; }
+  .kv { margin: 0; }
+  .kv dt { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: .5px; margin-top: 10px; }
+  .kv dt:first-child { margin-top: 0; }
+  .kv dd { margin: 3px 0 0; }
+  .muted { color: var(--muted); }
+  .empty { color: var(--muted); padding: 10px 2px; font-size: 13.5px; }
+  .empty b { color: var(--fg); font-weight: 600; }
+  .err { color: var(--fail); }
+  .loading { color: var(--muted); font-size: 13px; padding: 8px 0; }
+
+  /* Expandables */
+  details.item { border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); margin-bottom: 8px; overflow: hidden; }
+  details.item > summary { cursor: pointer; padding: 11px 14px; list-style: none; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-weight: 600; }
+  details.item > summary::-webkit-details-marker { display: none; }
+  details.item > summary::before { content: "\25B8"; color: var(--muted); transition: transform .12s ease; }
+  details.item[open] > summary::before { transform: rotate(90deg); }
+  details.item > summary .t { flex: 1 1 260px; min-width: 0; }
+  details.item .body { padding: 4px 16px 14px; border-top: 1px solid var(--line); }
+  details.item .body p { margin: 8px 0; }
+  details.item .body h4 { margin: 14px 0 4px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+
+  /* Findings */
+  .finding.reproduced { border-left: 3px solid var(--fail); }
+  .finding.unverified { border-left: 3px solid var(--muted); }
+  .finding.review { border-left: 3px solid var(--warn); }
+  .finding.cleared { border-left: 3px solid var(--ok); }
+
+  /* Stages */
+  .stages { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 6px 0 4px; }
+  .stage { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel-2); color: var(--muted); font-size: 12px; font-weight: 600; }
+  .stage .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+  .stage.done { color: var(--fg); }
+  .stage.done .dot { background: var(--ok); }
+.stage.current { color: #0b1020; background: var(--accent); border-color: var(--accent); }
+.stage.current .dot { background: #0b1020; animation: pulse 1s ease-in-out infinite; }
+.stage.failed { color: var(--fg); border-color: var(--fail); background: rgba(224,93,93,.14); }
+.stage.failed .dot { background: var(--fail); }
+.stage .mark { font-size: 11px; line-height: 1; font-weight: 700; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+
+  .runmeta { color: var(--muted); font-size: 12.5px; margin-top: 10px; }
+.runrow { display: flex; justify-content: space-between; gap: 10px; align-items: center; flex-wrap: wrap; }
+.runrow .u { font-size: 12.5px; word-break: break-all; }
+.changesgroup { font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin: 16px 0 6px; }
+.filters { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+.filters select, .filters input { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font-size: 12.5px; }
+.c-new { color: var(--fail); }
+.c-regressed { color: var(--fail); }
+.c-resolved { color: var(--ok); }
+.c-active { color: var(--warn); }
+  .links { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; }
+.btn.secondary.danger:hover { border-color: var(--fail); color: var(--fail); }
+
+/* Email settings. Reuses the card, chip, metric and field primitives above;
+   the only new rules are the ones the existing set has no name for. */
+.toast.ok { background: rgba(63,185,138,.14); color: var(--ok); border: 1px solid rgba(63,185,138,.4); }
+.toggle-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 4px 0 0; }
+.toggle-row label { display: inline-flex; align-items: center; gap: 9px; cursor: pointer; font-weight: 600; }
+.toggle-state { font-size: 12px; font-weight: 700; letter-spacing: .5px; padding: 3px 10px; border-radius: 999px; }
+.toggle-state.on { background: rgba(63,185,138,.16); color: var(--ok); }
+.toggle-state.off { background: rgba(152,161,179,.16); color: var(--muted); }
+input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; margin: 0; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+fieldset { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin: 0 0 14px; min-width: 0; }
+legend { font-size: 11.5px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); font-weight: 600; padding: 0 6px; }
+.eventlist { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; margin: 0; padding: 0; border: 0; }
+.eventlist label { display: flex; gap: 9px; align-items: flex-start; cursor: pointer; min-width: 0; }
+.eventlist .t { font-weight: 600; display: block; }
+.eventlist .d { color: var(--muted); font-size: 12px; display: block; margin-top: 2px; }
+.recipientrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 6px 0; border-bottom: 1px solid var(--line); min-width: 0; }
+.recipientrow:last-of-type { border-bottom: none; }
+.recipientrow .addr { flex: 1 1 200px; min-width: 0; word-break: break-all; }
+.fielderror { color: var(--fail); font-size: 12.5px; margin-top: 6px; }
+.fielderror:empty { display: none; }
+.recipients:empty::after { content: "No recipients yet."; color: var(--muted); font-size: 13px; }
+@media (max-width: 520px) {
+  .eventlist { grid-template-columns: 1fr; }
+  .recipientrow .addr { flex: 1 1 100%; }
+}
+
+/* --- top-level navigation ------------------------------------------------ */
+.mainnav { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-bottom: 20px; }
+.mainnav .brand { font-weight: 700; font-size: 15px; color: var(--fg); text-decoration: none; letter-spacing: .2px; }
+.mainnav a:not(.brand) { color: var(--muted); text-decoration: none; font-size: 13px; padding: 5px 10px; border-radius: 7px; border: 1px solid transparent; }
+.mainnav a:not(.brand):hover { color: var(--fg); border-color: var(--line); }
+.mainnav a.active { color: var(--fg); background: var(--panel-2); border-color: var(--line); }
+
+/* --- in-app notifications -------------------------------------------------- */
+.notifwrap { position: relative; margin-left: auto; }
+.notifbell { position: relative; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 5px 9px; cursor: pointer; font-size: 14px; line-height: 1; color: var(--fg); }
+.notifbell:hover { border-color: var(--accent); }
+.notificon { display: inline-block; }
+.notifbadge { position: absolute; top: -7px; right: -7px; min-width: 17px; padding: 1px 4px; border-radius: 999px; background: var(--fail); color: #fff; font-size: 10.5px; font-weight: 700; text-align: center; }
+.notifpanel { position: absolute; right: 0; top: 40px; width: 380px; max-width: 84vw; max-height: 70vh; overflow-y: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px; box-shadow: 0 12px 32px rgba(0,0,0,.35); z-index: 40; }
+.notifhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 4px 4px 10px; border-bottom: 1px solid var(--line); }
+.notifhead .muted { flex: 1 1 auto; font-size: 12px; }
+.notifitem { display: block; width: 100%; text-align: left; background: transparent; border: 1px solid transparent; border-left: 3px solid transparent; border-radius: 8px; padding: 9px 10px; cursor: pointer; color: var(--fg); }
+.notifitem:hover { background: var(--panel-2); border-color: var(--line); }
+.notifitem.unread { background: rgba(11,16,32,.05); border-left-color: var(--accent); }
+.notifitem + .notifitem { margin-top: 6px; }
+.notifrow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.notiftitle { font-weight: 600; font-size: 13px; }
+.notifmsg { color: var(--muted); font-size: 12.5px; margin: 4px 0 6px; }
+.notiffoot { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 11.5px; }
+.notifempty { color: var(--muted); padding: 14px 4px; font-size: 13px; }
+.notifdetail .lifecycle { list-style: none; margin: 6px 0 0; padding: 0; font-size: 12.5px; }
+.notifdetail .lifecycle li { display: flex; gap: 8px; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--line); }
+
+/* --- projects ------------------------------------------------------------ */
+.projectgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; }
+.projectcard { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.projecthead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.projectname { font-weight: 700; font-size: 15px; }
+.projectname a { color: var(--fg); text-decoration: none; }
+.projectname a:hover { color: var(--accent); }
+.projecturl { font-size: 12px; color: var(--muted); word-break: break-all; }
+.projectfacts { display: flex; gap: 16px; flex-wrap: wrap; }
+.projectfacts .v { font-size: 13px; }
+.projectcard .links { margin-top: 2px; }
+
+.runstable { width: 100%; border-collapse: collapse; font-size: 13px; }
+.runstable th { text-align: left; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; font-weight: 600; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--line); }
+.runstable td { padding: 9px 10px 9px 0; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.runstable tr:last-child td { border-bottom: none; }
+  .footer { color: var(--muted); font-size: 12px; margin-top: 26px; border-top: 1px solid var(--line); padding-top: 14px; }
+  .labelled { margin-top: 10px; }
+  .labelled .k { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; font-weight: 600; }
+  .labelled .v { margin-top: 2px; }
+  .steps { list-style: none; margin: 6px 0 0; padding: 0; counter-reset: step; }
+  .steps li { padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .steps li:last-child { border-bottom: none; }
+  .steps .n { color: var(--muted); font-weight: 700; margin-right: 8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>AI Website QA</h1>
+  <div class="sub">Automated website testing with evidence-based results</div>
+</header>
+<main id="app"></main>
+<script>
+"use strict";
+
+// ---------------------------------------------------------------------------
+// The browser is a THIN renderer. Every value below comes from
+// GET /api/qa/runs/:id/results, which is a bounded view of the report artifact
+// the real QA engine already wrote. The client computes no verdict, no
+// percentage, and no finding of its own.
+// ---------------------------------------------------------------------------
+// Stage tracker order. The authoritative list comes from the engine itself
+// (RUN_STAGES, carried on every run as its stageView), so the tracker can never
+// show an order the pipeline did not actually run. This is only the fallback for
+// a run that has not reported any stage yet.
+const STAGES = ["SCAN","ACCESS","GENERATE","ANALYZE","EXECUTE","VERIFY","COVERAGE","HISTORY","COMPLETE"];
+const STAGE_LABEL = { SCAN: "Scan", ACCESS: "Access", GENERATE: "Generate", ANALYZE: "Analyze", EXECUTE: "Execute", VERIFY: "Verify", COVERAGE: "Coverage", HISTORY: "History", COMPLETE: "Complete" };
+
+const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined && text !== null) n.textContent = text; return n; };
+const num = (v) => (typeof v === "number" && isFinite(v) ? v : 0);
+const arr = (v) => (Array.isArray(v) ? v : []);
+const link = (href, text, title) => { const a = el("a", null, text); a.href = href; if (title) a.title = title; return a; };
+const chip = (text, cls) => el("span", "chip " + (cls || "muted"), text);
+
+const STATUS_CLASS = { PASS: "ok", FAIL: "fail", REVIEW: "warn", BLOCKED: "fail", NOT_TESTED: "muted" };
+const SEVERITY_CLASS = { CRITICAL: "fail", HIGH: "fail", MEDIUM: "warn", LOW: "info", INFO: "muted" };
+const VERDICT_CLASS = { REPRODUCED: "fail", NOT_REPRODUCED: "ok", PASS: "ok", REVIEW_REQUIRED: "warn", REVIEW: "warn", BLOCKED: "fail", NOT_EXECUTED: "muted", DISCOVERED_ONLY: "muted", INFRASTRUCTURE_PROBLEM: "review" };
+
+const statusChip = (status) => chip(status || "UNKNOWN", STATUS_CLASS[status] || "muted");
+const verdictChip = (status) => chip(status || "UNKNOWN", VERDICT_CLASS[status] || "muted");
+const severityChip = (severity) => chip(severity || "INFO", SEVERITY_CLASS[severity] || "muted");
+const priorityChip = (priority) => chip(priority || "P?", priority === "P0" || priority === "P1" ? "fail" : priority === "P2" ? "warn" : "info");
+
+const card = (title, countText) => {
+  const c = el("div", "card");
+  const h = el("h2", null, title);
+  if (countText) h.appendChild(el("span", "count", countText));
+  c.appendChild(h);
+  return c;
+};
+const section = (title, id, countText, lede) => {
+  const c = card(title, countText);
+  c.id = id;
+  c.classList.add("section");
+  if (lede) c.appendChild(el("p", "lede", lede));
+  return c;
+};
+const addKV = (dl, label, value) => {
+  if (value === undefined || value === null || value === "") return;
+  dl.appendChild(el("dt", null, label));
+  dl.appendChild(el("dd", null, String(value)));
+};
+const labelled = (label, value) => {
+  const w = el("div", "labelled");
+  w.appendChild(el("div", "k", label));
+  w.appendChild(el("div", "v", String(value)));
+  return w;
+};
+const row = (ul, label, value, valueNode) => {
+  const li = el("li");
+  const r = el("div", "runrow");
+  r.appendChild(el("span", "muted", label));
+  r.appendChild(valueNode || el("strong", null, String(value)));
+  li.appendChild(r);
+  ul.appendChild(li);
+  return li;
+};
+const STAGE_SYMBOL = { done: "✓", current: "●", failed: "✕", pending: "○" };
+// The logical stage view the backend computed by replaying the engine's events.
+// A stage that legitimately runs twice (Generate: scenario suite, then the
+// verification spec) stays ONE chip: the backend keeps its completed state
+// instead of letting a second window drag it back to running, so the tracker
+// never looks like the pipeline restarted. Both real windows are still in
+// run.stageHistory. Nothing here is timed or estimated.
+const LOGICAL_CLASS = { pending: "pending", running: "current", completed: "done", failed: "failed" };
+const stageViewFrom = (run) => {
+  const byStage = {};
+  for (const stage of arr(run.stageView)) byStage[stage.stage] = stage;
+  return byStage;
+};
+const stageOrderFrom = (run) => {
+  const fromEngine = arr(run.stageView).map(stage => String(stage.stage || "").toUpperCase()).filter(name => STAGE_LABEL[name]);
+  return fromEngine.length ? fromEngine : STAGES;
+};
+const stageChip = (name, state) => {
+  const s = el("span", "stage " + state);
+  s.appendChild(el("span", "dot"));
+  s.appendChild(el("span", "mark", STAGE_SYMBOL[state] || STAGE_SYMBOL.pending));
+  s.appendChild(el("span", null, STAGE_LABEL[name] || name));
+  return s;
+};
+const formatMs = (ms) => {
+  const value = num(ms);
+  if (value <= 0) return null;
+  if (value < 1000) return value + " ms";
+  if (value < 60000) return (value / 1000).toFixed(1) + " s";
+  return Math.floor(value / 60000) + "m " + Math.round((value % 60000) / 1000) + "s";
+};
+const formatTime = (iso) => {
+  if (typeof iso !== "string" || !iso) return null;
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? iso : d.toLocaleString();
+};
+
+const app = document.getElementById("app");
+let activeRunId = null;
+let pollTimer = null;
+let busy = false;
+let onRunCompleted = null;
+let reloadFindings = null;
+
+// ---------------------------------------------------------------------------
+// Shell
+// ---------------------------------------------------------------------------
+function shell() {
+  app.innerHTML = "";
+  app.appendChild(mainNav());
+  const mount = el("div");
+  mount.id = "view";
+  app.appendChild(mount);
+}
+
+// ---------------------------------------------------------------------------
+// Navigation + routing
+//
+// Four views, chosen from the path. There is no router library here on purpose:
+// / is the QA console, /projects lists saved websites, /projects/:id shows one,
+// and /schedules shows every project's QA schedule.
+// ---------------------------------------------------------------------------
+function mainNav() {
+  const bar = el("nav", "mainnav");
+  const brand = el("a", "brand", "AI Website QA");
+  brand.href = "/";
+  bar.appendChild(brand);
+  const current = location.pathname;
+  const items = [["/", "Recent Runs"], ["/projects", "Projects"], ["/schedules", "Schedules"], ["/dashboard", "Dashboard"]];
+  for (const [href, label] of items) {
+    const a = el("a", null, label);
+    a.href = href;
+    if (href === current || (href !== "/" && current.startsWith(href))) a.classList.add("active");
+    if (href === "/dashboard") { a.target = "_blank"; a.rel = "noopener"; }
+    bar.appendChild(a);
+  }
+  // The notification bell lives in the same nav bar on every page, so an
+  // unattended notification is reachable from wherever the user already is.
+  bar.appendChild(notificationBell());
+  return bar;
+}
+
+function renderRoute() {
+  clearTimeout(pollTimer);
+  pollTimer = null;
+  activeRunId = null;
+  busy = false;
+  onRunCompleted = null;
+  reloadFindings = null;
+  app.innerHTML = "";
+  app.appendChild(mainNav());
+  const mount = el("div");
+  mount.id = "view";
+  app.appendChild(mount);
+  const projectMatch = location.pathname.match(/^\/projects\/([^/]+)\/?$/);
+  if (projectMatch) return renderProjectPage(mount, decodeURIComponent(projectMatch[1]));
+  if (location.pathname === "/projects" || location.pathname === "/projects/") return renderProjectsPage(mount);
+  if (location.pathname === "/schedules" || location.pathname === "/schedules/") return renderSchedulesPage(mount);
+  renderHomePage(mount);
+}
+
+function navigate(path) {
+  history.pushState({}, "", path);
+  renderRoute();
+}
+window.addEventListener("popstate", renderRoute);
+
+// ---------------------------------------------------------------------------
+// In-app notifications
+//
+// The bell is a THIN reader of GET /api/notifications. Every title, message,
+// type, severity and timestamp below is rendered exactly as the server recorded
+// it: this page decides nothing about whether an event happened, how important
+// it is, or what it means. Opening the panel does not mark anything read - only
+// clicking a notification or pressing "Mark all as read" does.
+// ---------------------------------------------------------------------------
+const NOTIFICATION_LABEL = {
+  NEW_FINDING: "New finding",
+  REGRESSED_FINDING: "Finding regressed",
+  RESOLVED_FINDING: "Finding resolved",
+  RUN_FAILED: "Run failed",
+  ACCESS_CHANGED: "Access changed",
+  SCHEDULE_SKIPPED: "Scheduled run skipped",
+  MEANINGFUL_CHANGE: "Meaningful change",
+};
+
+const FINDING_NOTIFICATION_TYPES = ["NEW_FINDING", "REGRESSED_FINDING", "RESOLVED_FINDING"];
+
+/** "4m ago" for recent events, the real timestamp for anything older. */
+const notificationAgo = (iso) => {
+  if (typeof iso !== "string" || !iso) return NOT_AVAILABLE;
+  const then = Date.parse(iso);
+  if (!isFinite(then)) return iso;
+  const seconds = Math.max(0, Math.round((Date.now() - then) / 1000));
+  if (seconds < 60) return seconds + "s ago";
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return minutes + "m ago";
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return hours + "h ago";
+  const days = Math.round(hours / 24);
+  if (days < 30) return days + "d ago";
+  return formatTime(iso) || iso;
+};
+
+/**
+ * Where a notification leads, using routes this app already has: a tracked
+ * finding lives on its project page, a run's results live on the console, and
+ * anything else about a project leads to that project. No new page is invented.
+ */
+const notificationDestination = (n) => {
+  const project = "/projects/" + encodeURIComponent(n.projectId);
+  if (n.findingId && FINDING_NOTIFICATION_TYPES.indexOf(n.type) !== -1) {
+    return { path: project + "?finding=" + encodeURIComponent(n.findingId), runId: null };
+  }
+  if (n.runId) return { path: "/", runId: n.runId };
+  return { path: project, runId: null };
+};
+
+const postNotification = (path) =>
+  apiJson(path, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+
+/** Opens a notification: navigate to its destination, and only then mark it read. */
+const openNotification = async (n) => {
+  const target = notificationDestination(n);
+  navigate(target.path);
+  if (target.runId) {
+    setTimeout(() => {
+      const panel = document.getElementById("result-panel");
+      openHistoricalRun(target.runId, document.getElementById("run-panel"), panel);
+    }, 0);
+  }
+  await postNotification("/api/notifications/" + encodeURIComponent(n.id) + "/read");
+};
+
+const notificationItem = (n, onChanged) => {
+  const item = el("button", n.read ? "notifitem" : "notifitem unread");
+  item.type = "button";
+  item.dataset.notificationId = n.id;
+  item.dataset.notificationType = n.type;
+  item.dataset.read = n.read ? "1" : "0";
+  if (!n.read) item.dataset.unread = "1";
+  const head = el("div", "notifrow");
+  head.appendChild(el("span", "notiftitle", n.title));
+  head.appendChild(chip(NOTIFICATION_LABEL[n.type] || n.type, "muted"));
+  if (n.severity) head.appendChild(severityChip(n.severity));
+  item.appendChild(head);
+  item.appendChild(el("div", "notifmsg", n.message));
+  const foot = el("div", "notiffoot");
+  foot.appendChild(el("span", null, notificationAgo(n.createdAt)));
+  foot.appendChild(el("span", null, n.projectName || ""));
+  item.appendChild(foot);
+  item.addEventListener("click", async () => {
+    await openNotification(n);
+    if (onChanged) onChanged();
+  });
+  return item;
+};
+
+/** The panel's contents: header with the unread count, mark-all, then the items. */
+const notificationPanelBody = (data, onChanged) => {
+  const frag = document.createDocumentFragment();
+  const head = el("div", "notifhead");
+  head.appendChild(el("strong", null, "Notifications"));
+  const unread = num(data.unreadCount);
+  head.appendChild(el("span", "muted", unread === 0 ? "No unread notifications" : unread + " unread"));
+  const markAll = el("button", "btn secondary", "Mark all as read");
+  markAll.type = "button";
+  markAll.id = "notif-mark-all";
+  markAll.disabled = unread === 0;
+  markAll.addEventListener("click", async (event) => {
+    event.stopPropagation();
+    await postNotification("/api/notifications/read-all");
+    if (onChanged) onChanged();
+  });
+  head.appendChild(markAll);
+  frag.appendChild(head);
+
+  const items = arr(data.notifications);
+  // No sample rows are ever shown: an empty inbox says so and nothing else.
+  if (!items.length) {
+    frag.appendChild(el("div", "notifempty", "No notifications yet."));
+    return frag;
+  }
+  for (const item of items) frag.appendChild(notificationItem(item, onChanged));
+  return frag;
+};
+
+function notificationBell() {
+  const wrap = el("div", "notifwrap");
+  const button = el("button", "notifbell");
+  button.type = "button";
+  button.id = "notification-bell";
+  button.setAttribute("aria-label", "Notifications");
+  button.setAttribute("aria-expanded", "false");
+  button.appendChild(el("span", "notificon", "🔔"));
+  const badge = el("span", "notifbadge");
+  badge.id = "notification-badge";
+  // A zero unread count shows no badge at all, rather than a misleading "0".
+  badge.hidden = true;
+  button.appendChild(badge);
+  wrap.appendChild(button);
+
+  let panel = null;
+
+  const applyBadge = (count) => {
+    if (count > 0) {
+      badge.textContent = String(count);
+      badge.hidden = false;
+    } else {
+      badge.textContent = "";
+      badge.hidden = true;
+    }
+  };
+
+  const closePanel = () => {
+    if (!panel) return;
+    panel.remove();
+    panel = null;
+    button.setAttribute("aria-expanded", "false");
+  };
+
+  const fillPanel = async () => {
+    const { ok, body } = await apiJson("/api/notifications?limit=50");
+    if (!panel) return;
+    panel.innerHTML = "";
+    if (!ok) {
+      panel.appendChild(el("p", "err", (body && body.error) || "Notifications could not be loaded."));
+      return;
+    }
+    applyBadge(num(body.unreadCount));
+    panel.appendChild(notificationPanelBody(body, () => { fillPanel(); refreshBadge(); }));
+  };
+
+  const refreshBadge = async () => {
+    const { ok, body } = await apiJson("/api/notifications/unread-count");
+    if (ok) applyBadge(num(body.count));
+  };
+
+  button.addEventListener("click", () => {
+    if (panel) { closePanel(); return; }
+    panel = el("div", "notifpanel");
+    panel.id = "notification-panel";
+    panel.appendChild(el("div", "loading", "Loading notifications…"));
+    wrap.appendChild(panel);
+    button.setAttribute("aria-expanded", "true");
+    fillPanel();
+  });
+
+  refreshBadge();
+  return wrap;
+}
+
+function renderHomePage(mount) {
+  const runCard = card("Run a QA check");
+  runCard.appendChild(el("p", "lede", "Enter a website URL. The real QA engine scans the site, executes safe tests, and produces evidence-based results."));
+  const bar = el("div", "runbar");
+  const field = el("div", "field");
+  const label = el("label", null, "Website URL"); label.setAttribute("for", "url");
+  const input = el("input", "input"); input.id = "url"; input.type = "url"; input.placeholder = "https://example.com"; input.autocomplete = "off";
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") startRun(); });
+  field.appendChild(label); field.appendChild(input);
+  const btn = el("button", "btn", "Run QA"); btn.id = "run-btn"; btn.type = "button";
+  btn.dataset.runBtn = "1"; btn.dataset.runLabel = "Run QA";
+  btn.addEventListener("click", () => startRun(null));
+  bar.appendChild(field); bar.appendChild(btn);
+  runCard.appendChild(bar);
+  runCard.appendChild(el("div", "hint", "Tip: save the site as a Project to run QA against it again and keep its history."));
+  const toast = el("div", "toast"); toast.id = "toast";
+  runCard.appendChild(toast);
+  mount.appendChild(runCard);
+
+  const runPanel = el("div"); runPanel.id = "run-panel"; mount.appendChild(runPanel);
+  const resultPanel = el("div"); resultPanel.id = "result-panel"; mount.appendChild(resultPanel);
+
+  const recentCard = card("Recent Runs"); recentCard.id = "recent-card";
+  const recentBody = el("div"); recentBody.id = "recent-body";
+  recentBody.appendChild(el("div", "empty", "Loading recent runs…"));
+  recentCard.appendChild(recentBody);
+  mount.appendChild(recentCard);
+
+  const footer = el("div", "footer");
+  footer.appendChild(el("span", null, "Read-only view of real QA engine runs. No results are simulated."));
+  footer.appendChild(document.createTextNode(" "));
+  footer.appendChild(link("/dashboard", "Open the full evidence explorer →"));
+  mount.appendChild(footer);
+  refreshRecent();
+}
+
+function showError(message) {
+  const t = document.getElementById("toast");
+  if (!t) return;
+  t.className = "toast error show";
+  t.textContent = message;
+}
+function clearToast() { const t = document.getElementById("toast"); if (t) { t.className = "toast"; t.textContent = ""; } }
+
+function setBusy(next) {
+  busy = next;
+  for (const btn of document.querySelectorAll("[data-run-btn]")) {
+    btn.disabled = next;
+    if (btn.dataset.runLabel) btn.textContent = next ? (btn.dataset.busyLabel || "Running…") : btn.dataset.runLabel;
+  }
+  const input = document.getElementById("url");
+  if (input) input.disabled = next;
+}
+
+// ---------------------------------------------------------------------------
+// Start + poll a real run
+// ---------------------------------------------------------------------------
+async function startRun(projectId) {
+  if (busy) return;
+  const input = document.getElementById("url");
+  const url = projectId ? null : ((input && input.value) || "").trim();
+  clearToast();
+  if (!projectId && !url) { showError("Enter a website URL to test."); return; }
+  setBusy(true);
+  try {
+    // A project run reuses the exact same endpoint pair the console uses; the
+    // only difference is that the server takes the URL from the saved project.
+    const [path, body] = projectId
+      ? ["/api/projects/" + encodeURIComponent(projectId) + "/runs", {}]
+      : ["/api/qa/run", { url }];
+    const res = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) { showError(data.error || "Could not start the QA run."); setBusy(false); return; }
+    activeRunId = data.run.runId;
+    renderRunPanel(data.run);
+    const panel = document.getElementById("result-panel");
+    if (panel) panel.innerHTML = "";
+    schedulePoll(400);
+  } catch {
+    showError("Could not reach the QA server. Is the dashboard still running?");
+    setBusy(false);
+  }
+}
+
+function schedulePoll(delay) {
+  clearTimeout(pollTimer);
+  pollTimer = setTimeout(pollOnce, delay);
+}
+
+async function pollOnce() {
+  if (!activeRunId) return;
+  let data;
+  try {
+    const res = await fetch("/api/qa/runs/" + encodeURIComponent(activeRunId));
+    if (!res.ok) { showError("The run could not be found."); setBusy(false); return; }
+    data = await res.json();
+  } catch {
+    showError("Lost connection to the QA server.");
+    setBusy(false);
+    return;
+  }
+  const run = data.run;
+  renderRunPanel(run);
+  if (run.state === "RUNNING") { schedulePoll(1200); return; }
+  setBusy(false);
+  if (run.state === "FAILED") showError(run.error || "The QA run failed before producing a report.");
+  if (run.state === "COMPLETED") await loadResult(run);
+  refreshRecent();
+  // A project page refreshes its saved summary from the artifact the run just
+  // wrote; the results panel above is left in place so the run stays readable.
+  if (onRunCompleted && (run.state === "COMPLETED" || run.state === "FAILED")) {
+    const done = onRunCompleted;
+    onRunCompleted = null;
+    await done();
+  }
+}
+
+function renderRunPanel(run) {
+  const panel = document.getElementById("run-panel");
+  if (!panel) return;
+  panel.innerHTML = "";
+  const c = card(run.state === "RUNNING" ? "Run in progress" : run.state === "COMPLETED" ? "Run complete" : "Run failed");
+  const stages = el("div", "stages");
+  // Real per-stage state from the engine's own events, in the order the engine
+  // ran them. Nothing is inferred from elapsed time, and a stage the engine
+  // never reached stays pending.
+  const view = stageViewFrom(run);
+  for (const name of stageOrderFrom(run)) {
+    const stage = view[String(name).toLowerCase()];
+    let state = stage ? (LOGICAL_CLASS[stage.state] || "pending") : "pending";
+    if (!stage && run.state === "RUNNING" && name === run.stage) state = "current";
+    stages.appendChild(stageChip(name, state));
+  }
+  c.appendChild(stages);
+  const meta = el("div", "runmeta");
+  if (run.state === "RUNNING") {
+    // Prefer the stage actually doing work over the last event, so a stage that
+    // has already finished does not get reported as the live one.
+    const key = String(run.runningStage || run.currentStage || run.stage || "").toUpperCase();
+    const label = STAGE_LABEL[key] || key || "starting";
+    const stage = view[String(key).toLowerCase()];
+    const stateWord = !stage ? "running" : stage.state === "failed" ? "failed" : stage.state === "completed" ? "completed" : "running";
+    meta.appendChild(el("span", null, "Current stage: " + label + " (" + stateWord + ") · "));
+  }
+  meta.appendChild(el("span", null, "Target: "));
+  meta.appendChild(el("code", null, run.url));
+  c.appendChild(meta);
+  if (run.state === "FAILED" && run.error) c.appendChild(el("p", "err", run.error));
+  // A stage that failed explains itself with the engine's own redacted message.
+  for (const name of stageOrderFrom(run)) {
+    const stage = view[String(name).toLowerCase()];
+    if (stage && stage.state === "failed" && stage.error) c.appendChild(el("p", "err", (STAGE_LABEL[name] || name) + " failed: " + stage.error));
+  }
+  panel.appendChild(c);
+}
+
+// ---------------------------------------------------------------------------
+// Load the productized results view
+// ---------------------------------------------------------------------------
+async function loadResult(run) {
+  const panel = document.getElementById("result-panel");
+  if (!panel) return;
+  panel.innerHTML = "";
+  const loading = card("Results");
+  loading.appendChild(el("div", "loading", "Loading the results for this run…"));
+  panel.appendChild(loading);
+  try {
+    const res = await fetch("/api/qa/runs/" + encodeURIComponent(run.runId) + "/results");
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      panel.innerHTML = "";
+      panel.appendChild(renderUnavailable(run, (data && data.error) || "The full report for this run is not available."));
+      return;
+    }
+    panel.innerHTML = "";
+    renderResult(data.results, run, data.findingsChanges, data.projectId, data.whatChanged);
+  } catch {
+    panel.innerHTML = "";
+    panel.appendChild(renderUnavailable(run, "The results view could not be loaded."));
+  }
+}
+
+/** Honest fallback: never invent a result for an artifact we cannot read. */
+function renderUnavailable(run, message) {
+  const c = card("Results unavailable");
+  c.appendChild(el("p", null, message));
+  c.appendChild(el("p", "muted", "This run's full report artifact is not readable, so no results are shown rather than a partial or invented summary."));
+  const links = el("div", "links");
+  links.appendChild(link("/api/qa/runs/" + encodeURIComponent(run.runId) + "/report", "Raw JSON report"));
+  if (run.historyRunId) links.appendChild(link("/dashboard#/runs/" + encodeURIComponent(run.historyRunId) + "/findings", "Open persisted evidence in the explorer →"));
+  c.appendChild(links);
+  return c;
+}
+
+// ---------------------------------------------------------------------------
+// Result rendering
+// ---------------------------------------------------------------------------
+function renderResult(results, run, changes, projectId, whatChanged) {
+  const panel = document.getElementById("result-panel");
+  if (!panel) return;
+  panel.appendChild(renderNav(results, Boolean(changes), Boolean(whatChanged)));
+  panel.appendChild(renderOverview(results, run));
+  // What Changed is the primary cross-dimension section for a project run, and
+  // sits directly under the overview. It carries its own availability, so a
+  // standalone run or an uncomparable pair shows the exact reason instead of a
+  // reassuring blank.
+  if (whatChanged) panel.appendChild(renderWhatChanged(whatChanged, run, projectId));
+  if (results.access) panel.appendChild(renderAccess(results.access));
+  // Findings Changes appears ONLY when a real project comparison exists. A
+  // standalone run, and a project run with no comparable predecessor, both
+  // render the Results Experience exactly as before with nothing invented.
+  if (changes) panel.appendChild(renderFindingsChanges(changes, run, projectId));
+  panel.appendChild(renderMetrics(results));
+  panel.appendChild(renderFindings(results));
+  panel.appendChild(renderVerification(results));
+  panel.appendChild(renderCoverage(results));
+  panel.appendChild(renderGaps(results));
+  panel.appendChild(renderFlows(results));
+  panel.appendChild(renderReports(results, run));
+}
+
+function renderNav(results, hasChanges, hasWhatChanged) {
+  const nav = el("div", "nav");
+  nav.id = "result-nav";
+  const base = hasChanges
+    ? [["changes", "Findings changes"], ["findings", "Findings"], ["verification", "Verification"], ["coverage", "Coverage"], ["gaps", "Gaps"], ["flows", "Test flows"], ["reports", "Reports"]]
+    : [["findings", "Findings"], ["verification", "Verification"], ["coverage", "Coverage"], ["gaps", "Gaps"], ["flows", "Test flows"], ["reports", "Reports"]];
+  const entries = hasWhatChanged ? [["what-changed", "What changed"]].concat(base) : base;
+  for (const [id, label] of entries) {
+    const a = el("a", null, label);
+    a.href = "#" + id;
+    a.addEventListener("click", (e) => {
+      const target = document.getElementById(id);
+      if (!target) return;
+      e.preventDefault();
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    nav.appendChild(a);
+  }
+  return nav;
+}
+
+// Descriptive lifecycle labels. Deliberately no score, no rank, no "healthy".
+const LIFECYCLE_LABEL = { NEW: "New", ACTIVE: "Still active", REGRESSED: "Regressed", RESOLVED: "Resolved" };
+const LIFECYCLE_CLASS = { NEW: "fail", ACTIVE: "warn", REGRESSED: "fail", RESOLVED: "ok" };
+
+/**
+ * Findings Changes: how this run's findings differ from the project's previous
+ * comparable run. Every number is a count of real finding identities, and each
+ * entry links to the evidence that already exists for it.
+ */
+// ---------------------------------------------------------------------------
+// What Changed — the run-to-run comparison, told as evidence.
+//
+// Everything below is a count or a recorded state taken from two real report
+// artifacts. There is no score, no rank, and no "better"/"worse" verdict: a
+// change is a difference, and a difference is not automatically an improvement.
+// Anything the artifacts do not support is shown as unavailable with its
+// machine-readable reason, never as zero.
+// ---------------------------------------------------------------------------
+
+/** The exact reason text, so a reader is never left guessing. */
+const CHANGE_REASON_TEXT = {
+  NO_PREVIOUS_RUN: "No previous run",
+  PREVIOUS_RUN_INCOMPLETE: "The previous run did not complete enough testing to compare",
+  CURRENT_RUN_INCOMPLETE: "This run did not complete enough testing to compare",
+  ACCESS_BOUNDARY: "The access state changed between these runs",
+  INSUFFICIENT_EVIDENCE: "Not enough recorded evidence to compare",
+};
+
+const changeTone = (kind) => (kind === "added" || kind === "new" || kind === "regressed" ? "fail" : kind === "removed" || kind === "resolved" ? "ok" : "muted");
+
+/** An expandable group. Collapsed by default so the section stays scannable. */
+function changeGroup(title, items, renderItem, emptyText) {
+  const items_ = arr(items);
+  const box = el("div", "changegroup");
+  const details = el("details");
+  const summary = el("summary");
+  summary.appendChild(document.createTextNode(title + " (" + items_.length + ")"));
+  details.appendChild(summary);
+  if (!items_.length) {
+    details.appendChild(el("p", "muted", emptyText || "No recorded change."));
+  } else {
+    const list = el("div", "list");
+    for (const item of items_) {
+      const node = renderItem(item);
+      if (node) list.appendChild(node);
+    }
+    details.appendChild(list);
+  }
+  box.appendChild(details);
+  return box;
+}
+
+/** A measurement row: current, previous, and the delta — or "not available". */
+function changeMeasure(label, block, key, unit) {
+  const current = block.current ? block.current[key] : null;
+  const previous = block.previous ? block.previous[key] : null;
+  const delta = block.delta ? block.delta[key] : null;
+  const li = el("li", "measure");
+  li.appendChild(el("span", "u", label));
+  const values = el("span", "muted");
+  const show = v => (v == null ? NOT_AVAILABLE : String(v) + (unit ? " " + unit : ""));
+  let deltaText = "delta " + (delta == null ? NOT_AVAILABLE : (delta > 0 ? "+" + delta : String(delta)));
+  values.appendChild(document.createTextNode(
+    "this run " + show(current) + " · previous " + show(previous) + " · " + deltaText
+  ));
+  li.appendChild(values);
+  return li;
+}
+
+function renderWhatChanged(summary, run, projectId) {
+  const c = section("What Changed", "what-changed", null,
+    "A comparison of this run with the project's previous run, read from both real report artifacts. Changes are differences, not judgements.");
+
+  const linkLine = "Compared with run " + (summary.previousRunId || NOT_AVAILABLE) + ".";
+  c.appendChild(el("p", "muted", linkLine));
+
+  // No honest comparison: say exactly why, and claim nothing.
+  if (!summary.comparisonAvailable) {
+    const why = el("p", "unavailable-reason");
+    why.appendChild(chip(summary.reason || "INSUFFICIENT_EVIDENCE", "muted"));
+    why.appendChild(document.createTextNode(" " + (CHANGE_REASON_TEXT[summary.reason] || "Comparison unavailable") + "."));
+    c.appendChild(why);
+    if (summary.reasonDetail) c.appendChild(el("p", "muted", summary.reasonDetail));
+    c.appendChild(changeLinks(run, projectId));
+    return c;
+  }
+
+  // PARTIAL across an access boundary: the transition is real, so show it, and
+  // say plainly that nothing else is being claimed.
+  if (summary.availability === "PARTIAL") {
+    const banner = el("p", "unavailable-reason");
+    banner.appendChild(chip(summary.reason || "ACCESS_BOUNDARY", "warn"));
+    banner.appendChild(document.createTextNode(" " + (summary.reasonDetail || "Only the access transition is reported.")));
+    c.appendChild(banner);
+  }
+
+  const strip = el("div", "metrics");
+  const cell = (label, value, tone) => {
+    const m = el("div", "metric");
+    m.appendChild(el("div", "v", String(value)));
+    m.appendChild(el("div", "k", label));
+    if (tone) m.classList.add("tone-" + tone);
+    return m;
+  };
+  const f = summary.findings || {};
+  const p = summary.pages || {};
+  const fl = summary.flows || {};
+  const e = summary.elements || {};
+  const counted = (list, kind) => arr(list).length || (kind === "added" ? 0 : 0);
+  strip.appendChild(cell("New findings", counted(f.new, "new"), "fail"));
+  strip.appendChild(cell("Resolved", counted(f.resolved, "resolved"), "ok"));
+  strip.appendChild(cell("Regressed", counted(f.regressed, "regressed"), "fail"));
+  strip.appendChild(cell("Pages changed", counted(p.added, "added") + counted(p.removed, "removed"), null));
+  strip.appendChild(cell("Flows changed", counted(fl.statusChanged, "added") + counted(fl.added, "added") + counted(fl.removed, "removed"), null));
+  strip.appendChild(cell("Interactive elements", num(e.interactiveAdded) + " added / " + num(e.interactiveRemoved) + " removed", null));
+  c.appendChild(strip);
+
+  // An honest "nothing changed" is a useful, real statement.
+  const nothingChanged =
+    !arr(f.new).length && !arr(f.resolved).length && !arr(f.regressed).length &&
+    !arr(p.added).length && !arr(p.removed).length &&
+    !arr(fl.added).length && !arr(fl.removed).length && !arr(fl.statusChanged).length &&
+    !arr(e.added).length && !arr(e.removed).length && !arr(e.unmatched).length;
+  if (nothingChanged) {
+    c.appendChild(el("p", "nochange", "No material changes detected between the comparable runs."));
+  }
+
+  // ---- Findings (changed only; the full breakdown stays in Findings Changes).
+  const changedFindings = [].concat(arr(f.new), arr(f.resolved), arr(f.regressed));
+  c.appendChild(changeGroup("Findings", changedFindings, (ref) => {
+    const li = el("li");
+    const head = el("div", "runrow");
+    head.appendChild(el("span", "u", ref.title || ref.id));
+    const tags = el("span");
+    tags.appendChild(chip(ref.severity, ref.severity === "CRITICAL" || ref.severity === "HIGH" ? "fail" : "muted"));
+    tags.appendChild(chip(LIFECYCLE_LABEL[ref.status] || ref.status, LIFECYCLE_CLASS[ref.status] || "muted"));
+    head.appendChild(tags);
+    li.appendChild(head);
+    if (ref.page) li.appendChild(el("div", "muted", ref.page));
+    // The existing historical-intelligence record, shown as recorded.
+    const history = summary.history && summary.history.findingReferences ? summary.history.findingReferences[ref.id] : null;
+    if (history) {
+      li.appendChild(el("div", "muted",
+        "History: " + history.lifecycle + " · confidence " + history.confidence + " · seen in " + arr(history.runIds).length + " run(s)"));
+    }
+    const links = el("div", "links");
+    if (projectId) links.appendChild(link("/projects/" + encodeURIComponent(projectId), "Tracked finding →"));
+    if (links.childNodes.length) li.appendChild(links);
+    return li;
+  }, "No finding changed between these runs."));
+
+  // ---- Pages
+  const pageItem = kind => (page) => {
+    const li = el("li");
+    const head = el("div", "runrow");
+    head.appendChild(el("span", "u", page.title || page.url));
+    head.appendChild(chip(kind, changeTone(kind)));
+    li.appendChild(head);
+    li.appendChild(el("div", "muted", page.url));
+    return li;
+  };
+  const pageUnavailable = p.available === false
+    ? el("p", "muted", (p.reason ? CHANGE_REASON_TEXT[p.reason] || p.reason : "Not compared") + (p.note ? ". " + p.note : "."))
+    : null;
+  const pagesBox = el("div", "changegroup");
+  const pagesDetails = el("details");
+  const pagesSummary = el("summary");
+  pagesSummary.appendChild(document.createTextNode("Pages (" + (arr(p.added).length + arr(p.removed).length) + ")"));
+  pagesDetails.appendChild(pagesSummary);
+  if (pageUnavailable) pagesDetails.appendChild(pageUnavailable);
+  else if (!arr(p.added).length && !arr(p.removed).length) pagesDetails.appendChild(el("p", "muted", "No page was added or removed."));
+  else {
+    const list = el("div", "list");
+    for (const page of arr(p.added)) list.appendChild(pageItem("added")(page));
+    for (const page of arr(p.removed)) list.appendChild(pageItem("removed")(page));
+    pagesDetails.appendChild(list);
+  }
+  pagesBox.appendChild(pagesDetails);
+  c.appendChild(pagesBox);
+
+  // ---- Flows
+  const flowsBox = el("div", "changegroup");
+  const flowsDetails = el("details");
+  const flowsSummary = el("summary");
+  flowsSummary.appendChild(document.createTextNode("Flows (" + (arr(fl.added).length + arr(fl.removed).length + arr(fl.statusChanged).length) + ")"));
+  flowsDetails.appendChild(flowsSummary);
+  if (fl.available === false) {
+    flowsDetails.appendChild(el("p", "muted", (fl.reason ? CHANGE_REASON_TEXT[fl.reason] || fl.reason : "Not compared") + (fl.note ? ". " + fl.note : ".")));
+  } else if (!arr(fl.added).length && !arr(fl.removed).length && !arr(fl.statusChanged).length) {
+    flowsDetails.appendChild(el("p", "muted", "No flow was added, removed or changed status."));
+  } else {
+    const list = el("div", "list");
+    for (const change of arr(fl.statusChanged)) {
+      const li = el("li");
+      const head = el("div", "runrow");
+      head.appendChild(el("span", "u", change.title || change.category || change.id));
+      head.appendChild(chip(change.transition, changeTone("changed")));
+      li.appendChild(head);
+      const meta = el("div", "muted");
+      meta.appendChild(document.createTextNode(
+        change.category ? change.category + " · " : ""
+        + (change.reason === "STEPS_CHANGED" ? "same flow family, changed steps" : "same flow, different recorded status")
+        + " · " + change.count + " flow(s)"
+        + (change.evidenceBacked ? "" : " · " + change.note)
+      ));
+      li.appendChild(meta);
+      list.appendChild(li);
+    }
+    for (const flow of arr(fl.added)) list.appendChild(flowItem("added", flow));
+    for (const flow of arr(fl.removed)) list.appendChild(flowItem("removed", flow));
+    flowsDetails.appendChild(list);
+  }
+  flowsBox.appendChild(flowsDetails);
+  c.appendChild(flowsBox);
+
+  // ---- Elements
+  const eBox = el("div", "changegroup");
+  const eDetails = el("details");
+  const eSummary = el("summary");
+  eSummary.appendChild(document.createTextNode("Elements (" + (arr(e.added).length + arr(e.removed).length + arr(e.unmatched).length) + ")"));
+  eDetails.appendChild(eSummary);
+  if (e.available === false) {
+    eDetails.appendChild(el("p", "muted", (e.reason ? CHANGE_REASON_TEXT[e.reason] || e.reason : "Not compared") + (e.note ? ". " + e.note : ".")));
+  } else {
+    eDetails.appendChild(el("p", "muted",
+      num(e.added) + " added · " + num(e.removed) + " removed · " + num(e.unmatched) + " unmatched · "
+      + num(e.interactiveAdded) + " interactive added · " + num(e.interactiveRemoved) + " interactive removed"
+      + (e.note ? " · " + e.note : "")));
+    const list = el("div", "list");
+    const elementItem = kind => (item) => {
+      const li = el("li");
+      const head = el("div", "runrow");
+      head.appendChild(el("span", "u", item.accessibleName || item.text || item.tag));
+      const tags = el("span");
+      tags.appendChild(chip(kind, changeTone(kind)));
+      if (item.interactive) tags.appendChild(chip("interactive", "muted"));
+      tags.appendChild(chip(item.tag, "muted"));
+      if (item.role) tags.appendChild(chip(item.role, "muted"));
+      head.appendChild(tags);
+      li.appendChild(head);
+      return li;
+    };
+    for (const item of arr(e.added)) list.appendChild(elementItem("added")(item));
+    for (const item of arr(e.removed)) list.appendChild(elementItem("removed")(item));
+    for (const item of arr(e.unmatched)) list.appendChild(elementItem("unmatched")(item));
+    eDetails.appendChild(list);
+  }
+  eBox.appendChild(eDetails);
+  c.appendChild(eBox);
+
+  // ---- Verification
+  const vBox = el("div", "changegroup");
+  const vDetails = el("details");
+  const vSummary = el("summary");
+  vSummary.appendChild(document.createTextNode("Verification"));
+  vDetails.appendChild(vSummary);
+  if (summary.verification && summary.verification.available === false) {
+    vDetails.appendChild(el("p", "muted", (summary.verification.note || "Not compared.")));
+  } else {
+    const list = el("div", "list");
+    for (const [label, key] of [
+      ["Findings scheduled", "scheduled"],
+      ["Findings executed", "executed"],
+      ["Reproduced", "reproduced"],
+      ["Not reproduced", "notReproduced"],
+      ["Skipped", "skipped"],
+      ["Review required", "reviewRequired"],
+      ["Unverified", "unverified"],
+      ["Infrastructure problems", "infrastructureProblems"],
+      ["Infrastructure failures", "infrastructureFailures"],
+    ]) {
+      list.appendChild(changeMeasure(label, summary.verification, key));
+    }
+    vDetails.appendChild(list);
+    vDetails.appendChild(el("p", "muted", "A skipped verification is never counted as a pass. Infrastructure failures describe the runner, not the website."));
+  }
+  vBox.appendChild(vDetails);
+  c.appendChild(vBox);
+
+  // ---- Coverage
+  const cBox = el("div", "changegroup");
+  const cDetails = el("details");
+  const cSummary = el("summary");
+  cSummary.appendChild(document.createTextNode("Coverage"));
+  cDetails.appendChild(cSummary);
+  if (summary.coverage && summary.coverage.available === false) {
+    cDetails.appendChild(el("p", "muted", (summary.coverage.note || "Not compared.")));
+  } else {
+    const list = el("div", "list");
+    for (const [label, key] of [
+      ["Pages tested", "pagesTested"],
+      ["Pages partially tested", "pagesPartial"],
+      ["Pages untested", "pagesUntested"],
+      ["Flows executed", "flowsExecuted"],
+      ["Interactions tested", "interactionsTested"],
+      ["Interactions partial", "interactionsPartial"],
+      ["Interactions untested", "interactionsUntested"],
+    ]) {
+      list.appendChild(changeMeasure(label, summary.coverage, key));
+    }
+    cDetails.appendChild(list);
+  }
+  cBox.appendChild(cDetails);
+  c.appendChild(cBox);
+
+  // ---- Access
+  const a = summary.access || {};
+  const aBox = el("div", "changegroup");
+  const aDetails = el("details");
+  const aSummary = el("summary");
+  aSummary.appendChild(document.createTextNode("Access"));
+  aDetails.appendChild(aSummary);
+  const aList = el("div", "list");
+  const aLi = el("li", "measure");
+  aLi.appendChild(el("span", "u", "Access state"));
+  const aVals = el("span", "muted");
+  aVals.appendChild(document.createTextNode(
+    (a.previous || NOT_AVAILABLE) + " → " + (a.current || NOT_AVAILABLE) + (a.changed ? " (changed)" : " (unchanged)")
+  ));
+  aLi.appendChild(aVals);
+  aList.appendChild(aLi);
+  aDetails.appendChild(aList);
+  aDetails.appendChild(el("p", "muted", a.note || ""));
+  aBox.appendChild(aDetails);
+  c.appendChild(aBox);
+
+  // ---- Recommendations
+  const r = summary.recommendations || {};
+  if (r.available !== false && (arr(r.added).length || arr(r.removed).length)) {
+    const rBox = el("div", "changegroup");
+    const rDetails = el("details");
+    const rSummary = el("summary");
+    rSummary.appendChild(document.createTextNode("Recommendations (" + (arr(r.added).length + arr(r.removed).length) + ")"));
+    rDetails.appendChild(rSummary);
+    const list = el("div", "list");
+    for (const rec of arr(r.added)) { const li = el("li"); const head = el("div", "runrow"); head.appendChild(el("span", "u", rec.name || rec.id)); head.appendChild(chip("added", changeTone("added"))); li.appendChild(head); list.appendChild(li); }
+    for (const rec of arr(r.removed)) { const li = el("li"); const head = el("div", "runrow"); head.appendChild(el("span", "u", rec.name || rec.id)); head.appendChild(chip("removed", changeTone("removed"))); li.appendChild(head); list.appendChild(li); }
+    rDetails.appendChild(list);
+    rBox.appendChild(rDetails);
+    c.appendChild(rBox);
+  }
+
+  c.appendChild(changeLinks(run, projectId));
+  return c;
+}
+
+function flowItem(kind, flow) {
+  const li = el("li");
+  const head = el("div", "runrow");
+  head.appendChild(el("span", "u", flow.title || flow.category || flow.id));
+  head.appendChild(chip(kind, changeTone(kind)));
+  li.appendChild(head);
+  const meta = el("div", "muted");
+  meta.appendChild(document.createTextNode(
+    (flow.category ? flow.category + " · " : "") + (flow.startPage || "") + " · " + num(flow.count) + " flow(s) with this signature"
+  ));
+  li.appendChild(meta);
+  return li;
+}
+
+function changeLinks(run, projectId) {
+  const links = el("div", "links");
+  if (projectId) links.appendChild(link("/api/projects/" + encodeURIComponent(projectId) + "/runs/" + encodeURIComponent(run.runId) + "/change-summary", "Change summary JSON"));
+  if (projectId) links.appendChild(link("/projects/" + encodeURIComponent(projectId), "Project run history →"));
+  return links;
+}
+
+function renderFindingsChanges(changes, run, projectId) {
+  const counts = changes.counts || {};
+  const c = section("Findings Changes", "changes", null, "Compared with the project's previous comparable run. These are counts of tracked findings, not a score.");
+  const strip = el("div", "metrics");
+  const cell = (label, value, tone) => {
+    const m = el("div", "metric");
+    m.appendChild(el("div", "v", String(value)));
+    m.appendChild(el("div", "k", label));
+    if (tone) m.classList.add("tone-" + tone);
+    return m;
+  };
+  strip.appendChild(cell("New", counts.new || 0, "fail"));
+  strip.appendChild(cell("Regressed", counts.regressed || 0, "fail"));
+  strip.appendChild(cell("Resolved", counts.resolved || 0, "ok"));
+  strip.appendChild(cell("Still active", counts.active || 0, "warn"));
+  c.appendChild(strip);
+
+  const group = (title, refs, tone) => {
+    const items = arr(refs);
+    const h = el("h3", "changesgroup", title + " (" + items.length + ")");
+    c.appendChild(h);
+    if (!items.length) {
+      c.appendChild(el("p", "muted", "None recorded in this run."));
+      return;
+    }
+    const list = el("div", "list");
+    for (const ref of items) {
+      const li = el("li");
+      const head = el("div", "runrow");
+      head.appendChild(el("span", "u", ref.title || ref.id));
+      const tags = el("span");
+      tags.appendChild(chip(ref.severity, ref.severity === "CRITICAL" || ref.severity === "HIGH" ? "fail" : "muted"));
+      tags.appendChild(chip(LIFECYCLE_LABEL[ref.status] || ref.status, LIFECYCLE_CLASS[ref.status] || "muted"));
+      head.appendChild(tags);
+      li.appendChild(head);
+      // Link straight into the existing evidence for this finding.
+      if (ref.runFindingId) {
+        const open = el("a", null, "Open evidence →");
+        open.href = "/dashboard#/runs/" + encodeURIComponent(run.runId) + "/findings";
+        li.appendChild(open);
+      }
+      if (projectId) {
+        const tracked = el("a", null, "Tracked finding →");
+        tracked.href = "/projects/" + encodeURIComponent(projectId);
+        li.appendChild(tracked);
+      }
+      list.appendChild(li);
+    }
+    c.appendChild(list);
+    if (tone) c.appendChild(el("p", "muted", tone));
+  };
+
+  group("New", changes.new);
+  group("Regressed", changes.regressed, "A regressed finding had been resolved and has returned. This is a lifecycle event, separate from the regression gate's policy decision.");
+  group("Resolved", changes.resolved, "Only findings whose area was meaningfully re-tested in this run are counted as resolved.");
+  group("Still active", changes.active);
+
+  const links = el("div", "links");
+  if (projectId) links.appendChild(link("/projects/" + encodeURIComponent(projectId), "See every tracked finding for this project →"));
+  links.appendChild(link("/api/projects/" + encodeURIComponent(projectId || "") + "/runs/" + encodeURIComponent(run.runId) + "/comparison", "Comparison JSON"));
+  c.appendChild(links);
+  return c;
+}
+
+function renderOverview(results, run) {
+  const o = results.overview || {};
+  const c = section("Results Overview", "overview");
+  const verdict = el("div", "verdict");
+  const badge = el("div", "status status-" + (o.status || "NOT_TESTED"), o.status || "NOT_TESTED");
+  verdict.appendChild(badge);
+  if (o.coverageStatement) verdict.appendChild(chip(o.coverageStatement, "info"));
+  if (o.durationMs) verdict.appendChild(chip(formatMs(o.durationMs) + " scan time", "muted"));
+  c.appendChild(verdict);
+  c.appendChild(el("p", "explanation", o.statusExplanation || "No status explanation was recorded."));
+  if (o.headline) c.appendChild(el("p", "headline", o.headline));
+
+  const kv = el("dl", "kv");
+  addKV(kv, "URL tested", o.url || run.url);
+  if (o.finalUrl && o.finalUrl !== o.url) addKV(kv, "Final URL after redirects", o.finalUrl);
+  addKV(kv, "Page title", o.title);
+  addKV(kv, "Run id", o.runId);
+  if (o.historyRunId) addKV(kv, "Persisted history run", o.historyRunId + (o.historyRunsAvailable != null ? " (" + o.historyRunsAvailable + " run(s) on record)" : ""));
+  addKV(kv, "Scanned", formatTime(o.scannedAt));
+  addKV(kv, "Report generated", formatTime(o.generatedAt));
+  addKV(kv, "Engine mode", o.mode);
+  if (o.aiProvider) addKV(kv, "AI provider", o.aiProvider);
+  c.appendChild(kv);
+  return c;
+}
+
+function renderAccess(access) {
+  const c = el("div", "banner " + access.kind);
+  c.id = "access";
+  c.appendChild(el("div", "ico", access.kind === "ACCESS_BLOCKED" ? "\u26D4" : "\u26A0"));
+  const body = el("div");
+  body.appendChild(el("h3", null, access.headline));
+  body.appendChild(el("p", null, access.message));
+  const facts = [];
+  if (access.httpStatus != null) facts.push("HTTP " + access.httpStatus);
+  if (access.challenge) facts.push("Challenge: " + access.challenge);
+  if (facts.length) body.appendChild(el("p", "muted", facts.join(" · ")));
+  body.appendChild(el("p", "notdefect", access.impact));
+  c.appendChild(body);
+  return c;
+}
+
+function renderMetrics(results) {
+  const wrap = el("div", "metrics");
+  for (const metric of arr(results.metrics)) {
+    const m = el("div", "metric");
+    m.appendChild(el("div", "v", String(num(metric.value))));
+    m.appendChild(el("div", "k", metric.label));
+    wrap.appendChild(m);
+  }
+  return wrap;
+}
+
+// --- Findings (primary) ---
+function renderFindings(results) {
+  const f = results.findings || { items: [], total: 0, reproduced: 0, notReproduced: 0, passed: 0, reviewRequired: 0, unverified: 0 };
+  const c = section("Findings", "findings", f.total ? String(f.total) : null,
+    f.total ? "Ordered by severity. Reproduced findings are confirmed problems on the live page; the rest are discovered observations." : null);
+  const summaryLine = el("div");
+  summaryLine.appendChild(chip(f.reproduced + " reproduced", f.reproduced ? "fail" : "muted"));
+  summaryLine.appendChild(chip(f.notReproduced + " not reproduced", "ok"));
+  summaryLine.appendChild(chip(f.passed + " checked and clean", "ok"));
+  summaryLine.appendChild(chip(f.reviewRequired + " need review", "warn"));
+  summaryLine.appendChild(chip(f.unverified + " unverified", "muted"));
+  c.appendChild(summaryLine);
+
+  if (!f.items.length) {
+    const empty = el("div", "empty");
+    empty.appendChild(document.createTextNode((results.empty && results.empty.messages.findings) || "No findings were recorded for this run."));
+    c.appendChild(empty);
+    return c;
+  }
+
+  for (const item of f.items) c.appendChild(findingItem(item));
+  return c;
+}
+
+function findingItem(item) {
+  const status = item.verification ? item.verification.status : null;
+  const disposition = item.verification ? item.verification.disposition : null;
+  const tone = status === "REPRODUCED" ? "reproduced"
+    : (status === "REVIEW" || disposition === "REVIEW_REQUIRED") ? "review"
+    : (status === "NOT_REPRODUCED" || status === "PASS") ? "cleared"
+    : "unverified";
+  const d = el("details", "item finding " + tone);
+  d.dataset.detailPath = item.detailPath;
+  const s = el("summary");
+  s.appendChild(severityChip(item.severity));
+  const title = el("span", "t", (item.code ? item.code + " — " : "") + item.title);
+  s.appendChild(title);
+  if (status) s.appendChild(verdictChip(status));
+  else if (disposition) s.appendChild(chip(disposition.replace(/_/g, " "), "muted"));
+  if (num(item.occurrenceCount) > 1) s.appendChild(chip(item.occurrenceCount + " occurrences", "muted"));
+  d.appendChild(s);
+  d.appendChild(findingBody(item));
+  return d;
+}
+
+function findingBody(item) {
+  const body = el("div", "body");
+  body.appendChild(el("p", null, item.headline));
+  const kv = el("dl", "kv");
+  addKV(kv, "Finding id", item.id);
+  addKV(kv, "Domain", item.domain);
+  addKV(kv, "Confidence", item.confidence);
+  addKV(kv, "Lifecycle", item.lifecycle);
+  addKV(kv, "Page", item.page);
+  if (num(item.occurrenceCount) === 0) addKV(kv, "Evidence", "No element-level evidence was recorded for this finding.");
+  body.appendChild(kv);
+  const note = el("div", "loading");
+  note.textContent = "Expand to load the full evidence for this finding.";
+  body.appendChild(note);
+  return body;
+}
+
+/** Lazy-loads the bounded finding detail view on first expand. */
+async function loadFindingDetail(detailPath, body) {
+  const note = body.querySelector(".loading");
+  try {
+    const res = await fetch(detailPath);
+    const data = await res.json().catch(() => ({}));
+    if (note) note.remove();
+    if (!res.ok) {
+      body.appendChild(el("p", "err", (data && data.error) || "The evidence for this finding could not be loaded."));
+      return;
+    }
+    const finding = data.finding || {};
+    if (finding.description) body.appendChild(labelled("What was found", finding.description));
+    if (finding.rationale) body.appendChild(labelled("Why this was flagged", finding.rationale));
+    if (finding.userImpact) body.appendChild(labelled("User impact", finding.userImpact));
+    if (finding.recommendation) body.appendChild(labelled("Recommended fix", finding.recommendation));
+
+    if (data.verification) {
+      const v = data.verification;
+      body.appendChild(el("h4", null, "Verification"));
+      const line = el("div");
+      line.appendChild(chip(v.disposition, VERDICT_CLASS[v.disposition] || "muted"));
+      if (v.status) line.appendChild(verdictChip(v.status));
+      if (v.category) line.appendChild(chip(v.category, "muted"));
+      if (v.verdict) line.appendChild(chip(v.verdict, "info"));
+      body.appendChild(line);
+      if (v.reason) body.appendChild(el("p", null, v.reason));
+      const vkv = el("dl", "kv");
+      addKV(vkv, "Strategy", v.strategy);
+      addKV(vkv, "Locator", v.locator);
+      addKV(vkv, "Executed at", formatTime(v.executedAt));
+      addKV(vkv, "Duration", formatMs(v.durationMs));
+      if (v.error) addKV(vkv, "Error", v.error.type ? v.error.type + ": " + v.error.message : v.error.message);
+      body.appendChild(vkv);
+      const rows = arr(v.evidence);
+      if (rows.length) {
+        const ul = el("ul", "list");
+        for (const r of rows) row(ul, r.label, r.value);
+        body.appendChild(ul);
+      }
+    }
+
+    const occurrences = arr(data.occurrences);
+    if (occurrences.length) {
+      body.appendChild(el("h4", null, "Evidence (" + occurrences.length + ")"));
+      for (const occurrence of occurrences) {
+        const d2 = el("details", "item");
+        const s2 = el("summary");
+        s2.appendChild(el("span", "t", occurrence.kind + (occurrence.selector ? " — " + occurrence.selector : "")));
+        if (occurrence.tag) s2.appendChild(chip(occurrence.tag, "muted"));
+        if (occurrence.visible === true) s2.appendChild(chip("visible", "ok"));
+        if (occurrence.visible === false) s2.appendChild(chip("not visible", "muted"));
+        d2.appendChild(s2);
+        const b2 = el("div", "body");
+        if (occurrence.note) b2.appendChild(el("p", "muted", occurrence.note));
+        const ul = el("ul", "list");
+        if (occurrence.accessibleName) row(ul, "Accessible name", occurrence.accessibleName);
+        if (occurrence.role) row(ul, "Role", occurrence.role);
+        if (occurrence.text) row(ul, "Text", occurrence.text);
+        if (occurrence.href) row(ul, "Href", occurrence.href);
+        if (occurrence.url) row(ul, "URL", occurrence.url);
+        if (occurrence.alt) row(ul, "Alt", occurrence.alt);
+        for (const d of arr(occurrence.detail)) row(ul, d.label, d.value);
+        if (ul.childNodes.length) b2.appendChild(ul);
+        d2.appendChild(b2);
+        body.appendChild(d2);
+      }
+    }
+
+    const rootCause = arr(data.rootCause);
+    if (rootCause.length) {
+      body.appendChild(el("h4", null, "Possible root cause"));
+      for (const candidate of rootCause) {
+        const p = el("p");
+        p.appendChild(el("strong", null, candidate.title));
+        p.appendChild(document.createTextNode(" · " + candidate.pattern + " · " + candidate.confidence));
+        body.appendChild(p);
+        if (candidate.description) body.appendChild(el("p", "muted", candidate.description));
+      }
+    }
+
+    for (const noteText of arr(data.notes)) body.appendChild(el("p", "muted", noteText));
+  } catch {
+    if (note) note.remove();
+    body.appendChild(el("p", "err", "The evidence for this finding could not be loaded."));
+  }
+}
+
+// --- Verification ---
+function renderVerification(results) {
+  const v = results.verification || {};
+  const c = section("Verification", "verification", null, "Every counter is a direct count from the run. Definitions state exactly what is included.");
+  c.appendChild(el("p", null, v.headline || "No verification summary was recorded."));
+  const ul = el("ul", "list");
+  for (const counter of arr(v.counters)) {
+    const li = row(ul, counter.label, counter.value);
+    if (counter.detail) li.appendChild(el("div", "muted", counter.detail));
+  }
+  c.appendChild(ul);
+
+  const verdicts = arr(v.verdicts);
+  if (verdicts.length) {
+    c.appendChild(el("h2", null, "Outcomes"));
+    for (const outcome of verdicts) {
+      const d = el("details", "item");
+      const s = el("summary");
+      s.appendChild(el("span", "t", outcome.findingTitle || outcome.findingId));
+      if (outcome.status) s.appendChild(verdictChip(outcome.status));
+      if (outcome.category) s.appendChild(chip(outcome.category, outcome.category === "WEBSITE" ? "fail" : "muted"));
+      if (outcome.verdict) s.appendChild(chip(outcome.verdict, "info"));
+      d.appendChild(s);
+      const body = el("div", "body");
+      if (outcome.reason) body.appendChild(el("p", null, outcome.reason));
+      const kv = el("dl", "kv");
+      addKV(kv, "Finding id", outcome.findingId);
+      addKV(kv, "Locator", outcome.locator);
+      addKV(kv, "Duration", formatMs(outcome.durationMs));
+      if (outcome.error) addKV(kv, "Error", outcome.error.message);
+      body.appendChild(kv);
+      d.appendChild(body);
+      c.appendChild(d);
+    }
+  } else if (v.emptyMessage) {
+    c.appendChild(el("div", "empty", v.emptyMessage));
+  }
+
+  const infra = arr(v.infrastructureNotes);
+  if (infra.length) {
+    c.appendChild(el("h2", null, "Infrastructure problems (not website defects)"));
+    const ul2 = el("ul", "list");
+    for (const note of infra) ul2.appendChild(el("li", null, note));
+    c.appendChild(ul2);
+  }
+  return c;
+}
+
+// --- Coverage overview ---
+function renderCoverage(results) {
+  const cov = results.coverage || {};
+  const c = section("Coverage Overview", "coverage", null, "Discovered is not the same as tested. Anything not executed is listed under Not Tested or Review.");
+  c.appendChild(el("p", null, cov.headline || "No coverage summary was recorded."));
+
+  if (!arr(cov.groups).length) {
+    c.appendChild(el("div", "empty", cov.emptyMessage || "No coverage data is available for this run."));
+    return c;
+  }
+  const cols = el("div", "cols");
+  for (const group of arr(cov.groups)) {
+    const g = el("div");
+    g.appendChild(el("div", "muted", group.title));
+    const ul = el("ul", "list");
+    for (const r of arr(group.rows)) row(ul, r.label, r.value);
+    g.appendChild(ul);
+    const note = el("div", "muted", group.note);
+    note.style.fontSize = "12px";
+    g.appendChild(note);
+    cols.appendChild(g);
+  }
+  c.appendChild(cols);
+  return c;
+}
+
+// --- Actionable gaps ---
+function renderGaps(results) {
+  const cov = results.coverage || {};
+  const groups = arr(cov.gapGroups);
+  const recs = arr(cov.recommendations);
+  const c = section("What Was Not Tested", "gaps", groups.length || recs.length ? String(groups.reduce((t, g) => t + num(g.count), 0)) : null,
+    "Each group states what is unconfirmed, why, and what it means for confidence in this result.");
+  if (!groups.length && !recs.length) {
+    const empty = el("div", "empty");
+    empty.appendChild(document.createTextNode(cov.emptyMessage || "No untested or review-required area was recorded."));
+    c.appendChild(empty);
+    return c;
+  }
+  for (const group of groups) {
+    const tone = group.kind === "blocked" ? "fail" : group.kind === "review" ? "warn" : "muted";
+    const d = el("details", "item");
+    const s = el("summary");
+    s.appendChild(el("span", "t", group.title));
+    s.appendChild(chip(group.kind.replace(/-/g, " "), tone));
+    d.appendChild(s);
+    const body = el("div", "body");
+    body.appendChild(el("p", null, group.confidenceNote));
+    if (arr(group.reasons).length) {
+      body.appendChild(el("h4", null, "Reasons recorded by the engine"));
+      const ul = el("ul", "list");
+      for (const reason of group.reasons) ul.appendChild(el("li", null, reason));
+      body.appendChild(ul);
+    }
+    const items = el("ul", "list");
+    for (const item of arr(group.items)) {
+      const li = el("li");
+      const r = el("div", "runrow");
+      r.appendChild(el("span", null, item.name));
+      const right = el("div");
+      right.appendChild(chip(item.category, "muted"));
+      if (item.safety && item.safety !== "NOT_APPLICABLE") right.appendChild(chip(item.safety, item.safety === "SAFE" ? "muted" : "warn"));
+      r.appendChild(right);
+      li.appendChild(r);
+      li.appendChild(el("div", "muted", item.reason + (item.url ? " · " + item.url : "")));
+      items.appendChild(li);
+    }
+    body.appendChild(items);
+    if (num(group.omitted) > 0) body.appendChild(el("p", "muted", "… and " + group.omitted + " more of this kind (full list in the HTML report)."));
+    d.appendChild(body);
+    c.appendChild(d);
+  }
+
+  if (recs.length) {
+    c.appendChild(el("h2", null, "Recommended next steps"));
+    for (const rec of recs) {
+      const d = el("details", "item");
+      const s = el("summary");
+      s.appendChild(priorityChip(rec.priority));
+      s.appendChild(el("span", "t", rec.title));
+      d.appendChild(s);
+      const body = el("div", "body");
+      body.appendChild(el("p", null, rec.reason));
+      if (rec.priorityReason) body.appendChild(labelled("Why this priority", rec.priorityReason));
+      const kv = el("dl", "kv");
+      addKV(kv, "Coverage items", arr(rec.coverageIds).join(", "));
+      addKV(kv, "Related findings", arr(rec.relatedFindings).join(", "));
+      body.appendChild(kv);
+      d.appendChild(body);
+      c.appendChild(d);
+    }
+  }
+  return c;
+}
+
+// --- Flows ---
+function renderFlows(results) {
+  const flows = results.flows || {};
+  const c = section("Test Flows", "flows", arr(flows.items).length ? String(arr(flows.items).length) : null,
+    "Discovered user flows and what happened when they ran. A flow that was never executed is not a pass.");
+  c.appendChild(el("p", null, flows.headline || "No flow summary was recorded."));
+  if (arr(flows.counters).length) {
+    const cols = el("div", "cols");
+    const ul = el("ul", "list");
+    for (const counter of arr(flows.counters)) row(ul, counter.label, counter.value);
+    cols.appendChild(ul);
+    c.appendChild(cols);
+  }
+  const items = arr(flows.items);
+  if (!items.length) {
+    c.appendChild(el("div", "empty", flows.emptyMessage || "No user flows were discovered for this run."));
+    return c;
+  }
+  for (const flow of items) {
+    const d = el("details", "item");
+    const s = el("summary");
+    s.appendChild(priorityChip(flow.priority));
+    s.appendChild(el("span", "t", flow.title));
+    s.appendChild(verdictChip(flow.status));
+    if (flow.safety && flow.safety !== "SAFE") s.appendChild(chip(flow.safety, "warn"));
+    d.appendChild(s);
+    const body = el("div", "body");
+    if (flow.description) body.appendChild(el("p", null, flow.description));
+    const kv = el("dl", "kv");
+    addKV(kv, "Flow id", flow.flowId);
+    addKV(kv, "Category", flow.category);
+    addKV(kv, "Start URL", flow.startUrl);
+    addKV(kv, "Automation", flow.automation);
+    addKV(kv, "Why this priority", flow.priorityReason);
+    body.appendChild(kv);
+    const reason = el("p", flow.status === "PASS" || flow.status === "REPRODUCED" ? null : "muted", flow.reason);
+    body.appendChild(reason);
+    const steps = arr(flow.steps);
+    if (steps.length) {
+      body.appendChild(el("h4", null, "Steps (" + steps.length + ")"));
+      const ul = el("ul", "steps");
+      for (const step of steps) {
+        const li = el("li");
+        const line = el("div", "runrow");
+        line.appendChild(el("span", null, step.index + ". " + step.action + (step.targetUrl ? " " + step.targetUrl : "")));
+        const right = el("div");
+        if (step.outcome) right.appendChild(verdictChip(step.outcome));
+        if (step.safety && step.safety !== "SAFE") right.appendChild(chip(step.safety, "warn"));
+        line.appendChild(right);
+        li.appendChild(line);
+        li.appendChild(el("div", "muted", "Expected: " + (step.expected || "not recorded") + (step.locator ? " · " + step.locator : "")));
+        if (step.reason) li.appendChild(el("div", "muted", step.reason));
+        if (step.outcomeReason) li.appendChild(el("div", "muted", step.outcomeReason));
+        if (step.error) li.appendChild(el("div", "err", step.error.message));
+        ul.appendChild(li);
+      }
+      body.appendChild(ul);
+    }
+    d.appendChild(body);
+    c.appendChild(d);
+  }
+  return c;
+}
+
+function renderReports(results, run) {
+  const reports = results.reports || {};
+  const c = section("Reports and Evidence", "reports");
+  c.appendChild(el("p", "lede", "The full artifacts produced by this run. Secondary to the summary above, but complete."));
+  const links = el("div", "links");
+  if (reports.html) links.appendChild(link(reports.html, "View full HTML report", "Complete 14-section report"));
+  links.appendChild(link(reports.json, "Raw JSON report", "The exact artifact the engine wrote"));
+  if (reports.execution) links.appendChild(link(reports.execution, "Execution evidence", "Playwright execution detail"));
+  const historyRunId = results.overview && results.overview.historyRunId;
+  if (historyRunId) links.appendChild(link("/dashboard#/runs/" + encodeURIComponent(historyRunId) + "/findings", "Open in evidence explorer →"));
+  c.appendChild(links);
+  const kv = el("dl", "kv");
+  addKV(kv, "Run id", (results.overview && results.overview.runId) || run.runId);
+  addKV(kv, "Findings analyzed", num(results.findings && results.findings.total));
+  c.appendChild(kv);
+  return c;
+}
+
+// Wire the lazy finding loader for every finding item on the page.
+document.addEventListener("toggle", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLDetailsElement) || !target.classList.contains("finding")) return;
+  if (!target.open) return;
+  const body = target.querySelector(".body");
+  if (!body || body.dataset.loaded === "1" || !target.dataset.detailPath) return;
+  body.dataset.loaded = "1";
+  loadFindingDetail(target.dataset.detailPath, body);
+}, true);
+
+// ---------------------------------------------------------------------------
+// Projects
+//
+// A project is a saved website. This page only organizes and links to real
+// engine runs: it never computes a status, never re-runs QA, and never fills in
+// a field the report did not produce.
+// ---------------------------------------------------------------------------
+const apiJson = async (path, options) => {
+  const res = await fetch(path, options);
+  return { status: res.status, ok: res.ok, body: await res.json().catch(() => ({})) };
+};
+
+const NOT_AVAILABLE = "not available";
+
+async function renderProjectsPage(mount) {
+  const create = card("Create Project");
+  create.appendChild(el("p", "lede", "Save a website so you can run QA against it again and keep its run history."));
+  const form = el("div", "runbar");
+  const nameField = el("div", "field");
+  const nameLabel = el("label", null, "Project name"); nameLabel.setAttribute("for", "project-name");
+  const nameInput = el("input", "input"); nameInput.id = "project-name"; nameInput.type = "text"; nameInput.placeholder = "AYN TV";
+  nameField.appendChild(nameLabel); nameField.appendChild(nameInput);
+  const urlField = el("div", "field");
+  const urlLabel = el("label", null, "Website URL"); urlLabel.setAttribute("for", "project-url");
+  const urlInput = el("input", "input"); urlInput.id = "project-url"; urlInput.type = "url"; urlInput.placeholder = "https://example.com";
+  urlField.appendChild(urlLabel); urlField.appendChild(urlInput);
+  const createBtn = el("button", "btn", "Create Project"); createBtn.id = "create-project-btn"; createBtn.type = "button";
+  form.appendChild(nameField); form.appendChild(urlField); form.appendChild(createBtn);
+  create.appendChild(form);
+  const toast = el("div", "toast"); toast.id = "toast";
+  create.appendChild(toast);
+  mount.appendChild(create);
+
+  const listCard = card("Projects");
+  const listBody = el("div"); listBody.id = "project-list";
+  listBody.appendChild(el("div", "empty", "Loading projects…"));
+  listCard.appendChild(listBody);
+  mount.appendChild(listCard);
+
+  const load = async () => {
+    const { ok, body } = await apiJson("/api/projects");
+    listBody.innerHTML = "";
+    if (!ok) { listBody.appendChild(el("p", "err", (body && body.error) || "Could not load projects.")); return; }
+    const projects = arr(body.projects);
+    if (!projects.length) {
+      listBody.appendChild(el("div", "empty", "No projects yet. Create one above to start tracking a website."));
+      return;
+    }
+    const grid = el("div", "projectgrid");
+    for (const project of projects) grid.appendChild(projectCard(project, load));
+    listBody.appendChild(grid);
+  };
+
+  createBtn.addEventListener("click", async () => {
+    createBtn.disabled = true;
+    const { status, ok, body } = await apiJson("/api/projects", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: nameInput.value, url: urlInput.value }),
+    });
+    createBtn.disabled = false;
+    if (!ok) { showProjectError(toast, status, (body && body.error) || "Could not create the project."); return; }
+    navigate("/projects/" + encodeURIComponent(body.project.id));
+  });
+
+  await load();
+}
+
+function projectCard(project, reload) {
+  const c = el("div", "projectcard");
+  const h = el("div", "projecthead");
+  const name = el("div", "projectname");
+  const openLink = el("a", null, project.name);
+  openLink.href = "/projects/" + encodeURIComponent(project.id);
+  openLink.addEventListener("click", e => { e.preventDefault(); navigate(openLink.getAttribute("href")); });
+  name.appendChild(openLink);
+  h.appendChild(name);
+  h.appendChild(project.lastStatus ? statusChip(project.lastStatus) : chip("Never run", "muted"));
+  c.appendChild(h);
+  c.appendChild(el("code", "projecturl", project.url));
+
+  const facts = el("div", "projectfacts");
+  facts.appendChild(labelled("Last run", formatTime(project.lastRunAt) || NOT_AVAILABLE));
+  facts.appendChild(labelled("Findings", project.lastFindingsCount == null ? NOT_AVAILABLE : String(project.lastFindingsCount)));
+  facts.appendChild(labelled("Coverage", project.lastCoverageStatus || NOT_AVAILABLE));
+  c.appendChild(facts);
+
+  const actions = el("div", "links");
+  const open = el("button", "btn secondary", "Open"); open.type = "button";
+  open.addEventListener("click", () => navigate("/projects/" + encodeURIComponent(project.id)));
+  const run = el("button", "btn secondary", "Run QA"); run.type = "button";
+  run.addEventListener("click", () => { location.href = "/projects/" + encodeURIComponent(project.id); });
+  const edit = el("button", "btn secondary", "Edit"); edit.type = "button";
+  edit.addEventListener("click", async () => {
+    const nextName = window.prompt("Project name", project.name);
+    if (nextName === null) return;
+    const patch = { name: nextName };
+    const { ok, body } = await apiJson("/api/projects/" + encodeURIComponent(project.id), {
+      method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(patch),
+    });
+    if (!ok) return window.alert((body && body.error) || "Could not update the project.");
+    await reload();
+  });
+  const del = el("button", "btn secondary danger", "Delete"); del.type = "button";
+  del.addEventListener("click", async () => {
+    if (!window.confirm('Delete "' + project.name + '"?\n\nThis removes the saved project only. QA run artifacts and engine history are kept.')) return;
+    const { ok, body } = await apiJson("/api/projects/" + encodeURIComponent(project.id), { method: "DELETE" });
+    if (!ok) return window.alert((body && body.error) || "Could not delete the project.");
+    await reload();
+  });
+  actions.appendChild(open); actions.appendChild(run); actions.appendChild(edit); actions.appendChild(del);
+  c.appendChild(actions);
+  return c;
+}
+
+function showProjectError(node, status, message) {
+  if (!node) return;
+  node.className = "toast error show";
+  node.textContent = status === 409 ? message + "  Open the existing project instead." : message;
+}
+
+// ---------------------------------------------------------------------------
+// QA schedules
+//
+// A schedule only decides when a project is tested. Every result shown here
+// comes from a run that really happened, and a slot that produced no run says
+// so with its recorded reason rather than being hidden.
+// ---------------------------------------------------------------------------
+const SCHEDULE_EXECUTION_LABEL = {
+  QUEUED: "Queued",
+  RUNNING: "Running",
+  COMPLETED: "Completed",
+  FAILED: "Failed",
+  SKIPPED_OVERLAPPING_RUN: "Skipped: run already in progress",
+  SKIPPED_PROJECT_MISSING: "Skipped: project no longer exists",
+  CANCELLED: "Cancelled",
+  INTERRUPTED: "Interrupted",
+};
+const SCHEDULE_EXECUTION_CLASS = {
+  QUEUED: "muted",
+  RUNNING: "warn",
+  COMPLETED: "ok",
+  FAILED: "fail",
+  SKIPPED_OVERLAPPING_RUN: "muted",
+  SKIPPED_PROJECT_MISSING: "muted",
+  CANCELLED: "muted",
+  INTERRUPTED: "warn",
+};
+
+const schedulePath = (projectId) => "/api/projects/" + encodeURIComponent(projectId) + "/schedule";
+
+const scheduleError = (node, message) => {
+  node.textContent = message;
+  node.className = "toast error show";
+};
+
+const scheduleClear = (node) => {
+  node.textContent = "";
+  node.className = "toast";
+};
+
+/** Timezone choices: the device zone, a fixed short list of common zones, and
+ *  whatever the schedule already uses. The server validates whatever is sent. */
+const COMMON_TIMEZONES = ["UTC", "Europe/Berlin", "Europe/London", "America/New_York", "America/Los_Angeles", "Asia/Tokyo", "Asia/Kolkata", "Australia/Sydney"];
+
+const timezoneOptions = (selected) => {
+  const frag = document.createDocumentFragment();
+  const zones = [];
+  for (const zone of browserTimezones()) zones.push([zone, zone + " (this device)"]);
+  for (const zone of COMMON_TIMEZONES) if (!zones.some(entry => entry[0] === zone)) zones.push([zone, zone]);
+  if (selected && !zones.some(entry => entry[0] === selected)) zones.unshift([selected, selected + " (current)"]);
+  for (const [value, label] of zones) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    if (value === selected) option.selected = true;
+    frag.appendChild(option);
+  }
+  return frag;
+};
+
+/** Every browser timezone, so a user is not limited to the short list. */
+const browserTimezones = () => {
+  try {
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return zone ? [zone] : [];
+  } catch { return []; }
+};
+
+/**
+ * Builds the QA Schedule card for one project, plus its Scheduled Runs history.
+ * Reloading is the whole refresh story: the card re-reads the persisted schedule
+ * rather than holding its own copy of the state.
+ */
+function scheduleSection(projectId, schedule, toast, openRun) {
+  const section = el("div");
+  section.id = "project-schedule";
+  const shell = card("QA Schedule");
+  section.appendChild(shell);
+  section.dataset.projectId = projectId;
+
+  const FREQUENCIES = [
+    ["EVERY_15_MINUTES", "Every 15 minutes"],
+    ["HOURLY", "Hourly"],
+    ["EVERY_6_HOURS", "Every 6 hours"],
+    ["DAILY", "Daily"],
+    ["WEEKLY", "Weekly"],
+  ];
+
+  const controls = el("div", "runbar");
+  const freqField = el("div", "field");
+  const freqLabel = el("label", null, "Frequency"); freqLabel.setAttribute("for", "schedule-frequency-" + projectId);
+  const freqInput = el("select", "input"); freqInput.id = "schedule-frequency-" + projectId;
+  for (const [value, label] of FREQUENCIES) {
+    const option = el("option", null, label);
+    option.value = value;
+    freqInput.appendChild(option);
+  }
+  freqField.appendChild(freqLabel);
+  freqField.appendChild(freqInput);
+
+  const zoneField = el("div", "field");
+  const zoneLabel = el("label", null, "Timezone"); zoneLabel.setAttribute("for", "schedule-timezone-" + projectId);
+  const zoneInput = el("select", "input"); zoneInput.id = "schedule-timezone-" + projectId;
+  // The full choice list is always present: the device zone is highlighted, the
+  // common zones stay available, and a schedule saved in any other IANA zone
+  // still appears as a selectable option.
+  const fillZones = (selected) => {
+    zoneInput.innerHTML = "";
+    zoneInput.appendChild(timezoneOptions(selected));
+  };
+  fillZones(schedule ? schedule.timezone : null);
+  zoneField.appendChild(zoneLabel);
+  zoneField.appendChild(zoneInput);
+
+  const save = el("button", "btn", schedule ? "Save schedule" : "Create schedule"); save.type = "button"; save.id = "schedule-save-btn";
+  controls.appendChild(freqField);
+  controls.appendChild(zoneField);
+  controls.appendChild(save);
+  shell.appendChild(controls);
+
+  if (!schedule) {
+    shell.appendChild(el("p", "muted", "This project has no QA schedule. Creating one tests this website automatically on the frequency you choose."));
+  }
+
+  const state = el("div");
+  shell.appendChild(state);
+  const historyCard = card("Scheduled Runs");
+  const historyHost = el("div");
+  historyCard.appendChild(historyHost);
+
+  const draw = (current) => {
+    // Rebuilt every draw so the saved zone is always present and selectable.
+    fillZones(current ? current.timezone : null);
+    freqInput.value = current ? current.frequency : "DAILY";
+    zoneInput.value = current ? current.timezone : (browserTimezones()[0] || "UTC");
+
+    state.innerHTML = "";
+    if (!current) {
+      const dl = el("dl", "kv");
+      addKV(dl, "Status", "Not scheduled");
+      addKV(dl, "Next run", NOT_AVAILABLE);
+      state.appendChild(dl);
+      return;
+    }
+    const dl = el("dl", "kv");
+    addKV(dl, "Status", current.enabled ? "Enabled" : "Disabled");
+    addKV(dl, "Frequency", current.frequencyLabel || current.frequency);
+    addKV(dl, "Timezone", current.timezone);
+    addKV(dl, "Next run", current.enabled ? (formatTime(current.nextRunAt) || current.nextRunAt || NOT_AVAILABLE) : NOT_AVAILABLE);
+    addKV(dl, "Last run", formatTime(current.lastRunAt) || NOT_AVAILABLE);
+    addKV(dl, "Last status", current.lastExecutionStatus ? (SCHEDULE_EXECUTION_LABEL[current.lastExecutionStatus] || current.lastExecutionStatus) : NOT_AVAILABLE);
+    addKV(dl, "Consecutive failures", current.consecutiveFailures == null ? NOT_AVAILABLE : String(current.consecutiveFailures));
+    state.appendChild(dl);
+
+    const actions = el("div", "links");
+    const toggle = el("button", "btn secondary", current.enabled ? "Disable" : "Enable");
+    toggle.type = "button";
+    toggle.dataset.scheduleToggle = current.enabled ? "disable" : "enable";
+    actions.appendChild(toggle);
+    if (current.enabled) {
+      const runNow = el("button", "btn secondary", "Run now"); runNow.type = "button";
+      runNow.dataset.scheduleRunNow = "1";
+      runNow.title = "Runs this schedule immediately through the same path a timed run takes.";
+      actions.appendChild(runNow);
+    }
+    actions.appendChild(link("/api/projects/" + encodeURIComponent(projectId) + "/schedule/history", "History JSON"));
+    state.appendChild(actions);
+
+    toggle.addEventListener("click", async () => {
+      scheduleClear(toast);
+      const action = toggle.dataset.scheduleToggle;
+      const res = await apiJson(schedulePath(projectId) + "/" + action, { method: "POST" });
+      if (!res.ok) { scheduleError(toast, (res.body && res.body.error) || "Could not change the schedule."); return; }
+      section.replaceWith(scheduleSection(projectId, res.body.schedule, toast, openRun));
+    });
+    const runNowBtn = actions.querySelector("[data-schedule-run-now]");
+    if (runNowBtn) {
+      runNowBtn.addEventListener("click", async () => {
+        scheduleClear(toast);
+        const res = await apiJson(schedulePath(projectId) + "/run-now", { method: "POST" });
+        if (!res.ok) { scheduleError(toast, (res.body && res.body.error) || "Could not start the scheduled run."); return; }
+        await loadHistory();
+        openRun(res.body.execution.runId);
+      });
+    }
+  };
+
+  save.addEventListener("click", async () => {
+    scheduleClear(toast);
+    const res = await apiJson(schedulePath(projectId), {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ frequency: freqInput.value, timezone: zoneInput.value, enabled: true }),
+    });
+    if (!res.ok) { scheduleError(toast, (res.body && res.body.error) || "Could not save the schedule."); return; }
+    section.replaceWith(scheduleSection(projectId, res.body.schedule, toast, openRun));
+  });
+
+  const loadHistory = async () => {
+    if (!schedule) { historyHost.innerHTML = ""; return; }
+    historyHost.innerHTML = "";
+    const { ok, body } = await apiJson(schedulePath(projectId) + "/history");
+    if (!ok) {
+      historyHost.appendChild(el("p", "err", (body && body.error) || "Scheduled runs could not be loaded."));
+      return;
+    }
+    const executions = arr(body.executions);
+    if (!executions.length) {
+      historyHost.appendChild(el("div", "empty", "No scheduled runs yet. Each slot that fires is recorded here with its real outcome."));
+      return;
+    }
+    const table = el("table", "runstable");
+    const thead = el("thead");
+    const hr = el("tr");
+    for (const heading of ["Scheduled for", "Status", "Run", "Detail"]) hr.appendChild(el("th", null, heading));
+    thead.appendChild(hr);
+    table.appendChild(thead);
+    const tbody = el("tbody");
+    for (const execution of executions) {
+      const tr = el("tr");
+      tr.appendChild(el("td", null, formatTime(execution.scheduledFor) || execution.scheduledFor));
+      const statusCell = el("td");
+      statusCell.appendChild(chip(SCHEDULE_EXECUTION_LABEL[execution.status] || execution.status, SCHEDULE_EXECUTION_CLASS[execution.status] || "muted"));
+      tr.appendChild(statusCell);
+      const runCell = el("td");
+      if (execution.runId) {
+        const view = el("button", "btn secondary", "Open results"); view.type = "button";
+        view.addEventListener("click", () => openRun(execution.runId));
+        runCell.appendChild(view);
+      } else {
+        runCell.appendChild(el("span", "muted", "no run"));
+      }
+      tr.appendChild(runCell);
+      tr.appendChild(el("td", null, execution.detail || NOT_AVAILABLE));
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    historyHost.appendChild(table);
+    historyHost.appendChild(el("p", "muted", "Only slots that actually fired are listed. A scheduled run uses the same engine and produces the same results as a manual run."));
+  };
+
+  draw(schedule);
+  loadHistory();
+  section.appendChild(historyCard);
+  return section;
+}
+
+async function renderSchedulesPage(mount) {
+  const { ok, body } = await apiJson("/api/schedules");
+  if (!ok) {
+    mount.appendChild(el("p", "err", (body && body.error) || "Schedules could not be loaded."));
+    return;
+  }
+  const schedules = arr(body.schedules);
+  const overview = card("QA Schedules");
+  overview.appendChild(el("p", "lede", "Every project's recurring QA test. A schedule only decides when a project is tested; the runs it starts are ordinary QA runs."));
+  mount.appendChild(overview);
+
+  if (!schedules.length) {
+    const empty = card("No schedules yet");
+    empty.appendChild(el("div", "empty", "No project has a QA schedule yet."));
+    const all = link("/projects", "Open projects →");
+    const wrap = el("div", "links");
+    wrap.appendChild(all);
+    empty.appendChild(wrap);
+    mount.appendChild(empty);
+    return;
+  }
+
+  const list = card("All schedules", String(schedules.length));
+  const table = el("table", "runstable");
+  const thead = el("thead");
+  const hr = el("tr");
+  for (const heading of ["Project", "Frequency", "Timezone", "Status", "Next run", "Last status", "Scheduled runs"]) hr.appendChild(el("th", null, heading));
+  thead.appendChild(hr);
+  table.appendChild(thead);
+  const tbody = el("tbody");
+  for (const schedule of schedules) {
+    const tr = el("tr");
+    const projectCell = el("td");
+    if (schedule.projectId) {
+      const open = el("a", null, schedule.projectName || schedule.projectId);
+      open.href = "/projects/" + encodeURIComponent(schedule.projectId);
+      open.addEventListener("click", e => { e.preventDefault(); navigate("/projects/" + encodeURIComponent(schedule.projectId)); });
+      projectCell.appendChild(open);
+    } else {
+      projectCell.appendChild(el("span", "muted", NOT_AVAILABLE));
+    }
+    tr.appendChild(projectCell);
+    tr.appendChild(el("td", null, schedule.frequencyLabel || schedule.frequency));
+    tr.appendChild(el("td", null, schedule.timezone));
+    const statusCell = el("td");
+    statusCell.appendChild(chip(schedule.enabled ? "Enabled" : "Disabled", schedule.enabled ? "ok" : "muted"));
+    tr.appendChild(statusCell);
+    tr.appendChild(el("td", null, schedule.enabled ? (formatTime(schedule.nextRunAt) || schedule.nextRunAt || NOT_AVAILABLE) : NOT_AVAILABLE));
+    tr.appendChild(el("td", null, schedule.lastExecutionStatus ? (SCHEDULE_EXECUTION_LABEL[schedule.lastExecutionStatus] || schedule.lastExecutionStatus) : NOT_AVAILABLE));
+    const historyCell = el("td");
+    if (schedule.enabled) {
+      const open = el("a", null, "View");
+      open.href = "/projects/" + encodeURIComponent(schedule.projectId);
+      open.addEventListener("click", e => { e.preventDefault(); navigate("/projects/" + encodeURIComponent(schedule.projectId)); });
+      historyCell.appendChild(open);
+    } else {
+      historyCell.appendChild(el("span", "muted", NOT_AVAILABLE));
+    }
+    tr.appendChild(historyCell);
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  list.appendChild(table);
+  mount.appendChild(list);
+
+  if (schedule.projectMissingCount !== 0) {
+    const warn = card("Attention");
+    warn.appendChild(el("p", "muted", "A schedule without its project is skipped and records why, rather than failing silently."));
+    mount.appendChild(warn);
+  }
+
+  const upcoming = arr(body.upcoming);
+  const next = card("Next scheduled runs");
+  if (!upcoming.length) {
+    next.appendChild(el("div", "empty", "No enabled schedule has an upcoming run."));
+  } else {
+    const ul = el("div", "list");
+    for (const entry of upcoming) {
+      const li = el("li");
+      const text = (formatTime(entry.nextRunAt) || entry.nextRunAt) + " · project " + entry.projectId;
+      const open = el("a", null, text);
+      open.href = "/projects/" + encodeURIComponent(entry.projectId);
+      open.addEventListener("click", e => { e.preventDefault(); navigate("/projects/" + encodeURIComponent(entry.projectId)); });
+      li.appendChild(open);
+      ul.appendChild(li);
+    }
+    next.appendChild(ul);
+  }
+  mount.appendChild(next);
+}
+
+// ---------------------------------------------------------------------------
+// Project email settings
+//
+// Configures who a project emails and which events it emails about. It reads and
+// writes the project's persisted settings and nothing else: this section never
+// starts a run, never touches findings, schedules or history, and never sends
+// mail of its own accord. The only button that can send anything is the explicit
+// test email, which goes to the configured recipients through the same transport
+// a real alert would use.
+//
+// The event checkboxes are rendered from the API's canonical list, so this file
+// carries no second copy of the event taxonomy that could drift from the
+// backend. If the load fails, nothing is shown as configured: an unreachable API
+// must never look like saved settings.
+// ---------------------------------------------------------------------------
+
+/**
+ * The event order used when a checkbox is ticked.
+ *
+ * Sourced from the loaded `eventOptions` so it always matches the backend's
+ * canonical order, including any type added later.
+ */
+let NOTIFICATION_EVENT_ORDER = [];
+
+const emailSettingsPath = (projectId) => "/api/projects/" + encodeURIComponent(projectId) + "/email-settings";
+
+/**
+ * Normalizes a typed address for comparison and submission.
+ *
+ * Mirrors the backend's rule closely enough to catch obvious mistakes inline,
+ * but the SERVER is the authority: every save is validated again on the way in,
+ * so a client that is slightly out of date cannot persist a bad address.
+ */
+const normalizeTypedEmail = (value) => {
+  const trimmed = String(value == null ? "" : value).trim();
+  if (!trimmed || trimmed.length > 254) return null;
+  const lower = trimmed.toLowerCase();
+  if (/[\s,;<>"']/.test(lower)) return null;
+  const at = lower.indexOf("@");
+  if (at <= 0 || at !== lower.lastIndexOf("@") || at === lower.length - 1) return null;
+  if (lower.indexOf("..") !== -1) return null;
+  const domain = lower.slice(at + 1);
+  // Rejects an empty or hyphen-led domain label, which no mail server accepts.
+  if (!domain || domain.charAt(0) === "-" || domain.charAt(domain.length - 1) === "-") return null;
+  return lower;
+};
+
+const emailStatusCell = (label, value, tone) => {
+  const cell = el("div", "metric");
+  const v = el("div", "v", value);
+  if (tone) v.style.color = "var(--" + tone + ")";
+  cell.appendChild(v);
+  cell.appendChild(el("div", "k", label));
+  return cell;
+};
+
+function emailSettingsSection(projectId) {
+  const wrapper = el("div");
+  wrapper.id = "project-email-settings";
+  wrapper.dataset.projectId = projectId;
+
+  const shell = card("Email Notifications");
+  wrapper.appendChild(shell);
+  shell.appendChild(el("p", "lede", "Email selected notification events to this project's recipients. Saving settings does not send anything."));
+
+  let events = [];
+  let missingSmtp = [];
+  let state = { enabled: false, recipients: [], events: [] };
+  let smtpConfigured = false;
+
+  // --- Enable / disable ----------------------------------------------------------
+  const toggleRow = el("div", "toggle-row");
+  const toggleLabel = el("label");
+  const toggle = el("input"); toggle.type = "checkbox"; toggle.id = "email-enabled-" + projectId;
+  toggleLabel.appendChild(toggle);
+  toggleLabel.appendChild(el("span", null, "Email notifications"));
+  const toggleState = el("span", "toggle-state off", "OFF");
+  toggleRow.appendChild(toggleLabel);
+  toggleRow.appendChild(toggleState);
+  shell.appendChild(toggleRow);
+
+  const strip = el("div", "metrics");
+  shell.appendChild(strip);
+
+  const smtpBanner = el("div", "banner UNKNOWN");
+  smtpBanner.hidden = true;
+  shell.appendChild(smtpBanner);
+
+  // --- Recipients ----------------------------------------------------------------
+  const recipientFieldset = el("fieldset");
+  recipientFieldset.appendChild(el("legend", null, "Email recipients"));
+  const recipientList = el("div", "recipients");
+  recipientFieldset.appendChild(recipientList);
+
+  const addRow = el("div", "runbar");
+  const addField = el("div", "field");
+  const addLabel = el("label", null, "Add recipient");
+  addLabel.setAttribute("for", "email-recipient-" + projectId);
+  const addInput = el("input", "input");
+  addInput.id = "email-recipient-" + projectId;
+  addInput.type = "email";
+  addInput.placeholder = "qa@example.com";
+  addInput.autocomplete = "off";
+  addInput.setAttribute("aria-describedby", "email-recipient-error-" + projectId);
+  addField.appendChild(addLabel);
+  addField.appendChild(addInput);
+  const addError = el("div", "fielderror");
+  addError.id = "email-recipient-error-" + projectId;
+  addError.setAttribute("role", "alert");
+  addField.appendChild(addError);
+  const addBtn = el("button", "btn", "Add recipient"); addBtn.type = "button";
+  addRow.appendChild(addField);
+  addRow.appendChild(addBtn);
+  recipientFieldset.appendChild(addRow);
+  shell.appendChild(recipientFieldset);
+
+  // --- Events --------------------------------------------------------------------
+  const eventFieldset = el("fieldset");
+  eventFieldset.appendChild(el("legend", null, "Notification events"));
+  const eventList = el("div", "eventlist");
+  eventFieldset.appendChild(eventList);
+  shell.appendChild(eventFieldset);
+
+  // --- Actions -------------------------------------------------------------------
+  const actions = el("div", "links");
+  const saveBtn = el("button", "btn", "Save settings");
+  saveBtn.type = "button"; saveBtn.id = "email-save-btn";
+  const testBtn = el("button", "btn secondary", "Send test email");
+  testBtn.type = "button"; testBtn.id = "email-test-btn";
+  actions.appendChild(saveBtn);
+  actions.appendChild(testBtn);
+  shell.appendChild(actions);
+  shell.appendChild(el("p", "hint", "A test email confirms delivery only. It is not a QA notification and does not appear in the notification history."));
+
+  const status = el("div", "toast");
+  status.id = "email-status";
+  status.setAttribute("role", "status");
+  status.setAttribute("aria-live", "polite");
+  shell.appendChild(status);
+
+  const say = (message, tone) => {
+    status.className = "toast" + (tone ? " " + tone : "");
+    status.textContent = message || "";
+    if (message) status.classList.add("show");
+  };
+
+  // --- Render --------------------------------------------------------------------
+  const renderStrip = () => {
+    strip.innerHTML = "";
+    strip.appendChild(emailStatusCell("Email notifications", state.enabled ? "Enabled" : "Disabled", state.enabled ? "ok" : null));
+    strip.appendChild(emailStatusCell("Recipients", state.recipients.length + " configured"));
+    strip.appendChild(emailStatusCell("Events", state.events.length + " selected"));
+    strip.appendChild(emailStatusCell("SMTP", smtpConfigured ? "Configured" : "Not configured", smtpConfigured ? "ok" : "warn"));
+  };
+
+  const renderSmtpBanner = () => {
+    smtpBanner.hidden = smtpConfigured;
+    if (smtpConfigured) return;
+    smtpBanner.innerHTML = "";
+    // Only the NAMES of missing variables. The dashboard is never shown SMTP
+    // connection details or credentials, because the API never returns them.
+    smtpBanner.appendChild(el("span", "ico", "!"));
+    const box = el("div");
+    box.appendChild(el("h3", null, "SMTP not configured"));
+    box.appendChild(el("p", null, "Settings can still be saved, but no email can be sent until SMTP is configured on the server."));
+    if (missingSmtp.length) box.appendChild(el("p", "notdefect", "Missing: " + missingSmtp.join(", ")));
+    smtpBanner.appendChild(box);
+  };
+
+  const renderRecipients = () => {
+    recipientList.innerHTML = "";
+    for (const address of state.recipients) {
+      const row = el("div", "recipientrow");
+      row.appendChild(el("span", "addr", address));
+      const remove = el("button", "btn secondary danger", "Remove");
+      remove.type = "button";
+      // The accessible name names the address, so several identical-looking
+      // "Remove" buttons stay distinguishable to a screen reader.
+      remove.setAttribute("aria-label", "Remove " + address);
+      remove.addEventListener("click", () => {
+        state.recipients = state.recipients.filter(entry => entry !== address);
+        renderRecipients();
+        renderStrip();
+        say("Recipient removed. Select Save settings to keep this change.");
+      });
+      row.appendChild(remove);
+      recipientList.appendChild(row);
+    }
+  };
+
+  const renderEvents = () => {
+    eventList.innerHTML = "";
+    for (const option of events) {
+      const id = "email-event-" + option.type + "-" + projectId;
+      const label = el("label");
+      label.setAttribute("for", id);
+      const box = el("input");
+      box.type = "checkbox";
+      box.id = id;
+      box.value = option.type;
+      box.checked = state.events.indexOf(option.type) !== -1;
+      box.addEventListener("change", () => {
+        // Ticking keeps canonical order; unticking just drops the type.
+        state.events = box.checked
+          ? NOTIFICATION_EVENT_ORDER.filter(type => type === option.type || state.events.indexOf(type) !== -1)
+          : state.events.filter(type => type !== option.type);
+        renderStrip();
+      });
+      const text = el("span");
+      text.appendChild(el("span", "t", option.label));
+      text.appendChild(el("span", "d", option.description));
+      label.appendChild(box);
+      label.appendChild(text);
+      eventList.appendChild(label);
+    }
+  };
+
+  // Recipients and events only apply while email is on, so they are hidden when
+  // it is off rather than shown as controls that would do nothing.
+  const renderEnabled = () => {
+    toggle.checked = state.enabled;
+    toggleState.textContent = state.enabled ? "ON" : "OFF";
+    toggleState.className = "toggle-state " + (state.enabled ? "on" : "off");
+    recipientFieldset.hidden = !state.enabled;
+    eventFieldset.hidden = !state.enabled;
+    testBtn.disabled = !state.enabled;
+    renderStrip();
+  };
+
+  const draw = () => {
+    renderEnabled();
+    renderRecipients();
+    renderEvents();
+    renderSmtpBanner();
+  };
+
+  // --- Behaviour -----------------------------------------------------------------
+  toggle.addEventListener("change", () => {
+    state.enabled = toggle.checked;
+    renderEnabled();
+    say("Select Save settings to keep this change.");
+  });
+
+  const addRecipient = () => {
+    const normalized = normalizeTypedEmail(addInput.value);
+    if (!normalized) {
+      // Associated with the input through aria-describedby and announced, so the
+      // error is never colour-only.
+      addError.textContent = "Enter a valid email address.";
+      addInput.setAttribute("aria-invalid", "true");
+      addInput.focus();
+      return;
+    }
+    if (state.recipients.indexOf(normalized) !== -1) {
+      addError.textContent = normalized + " is already a recipient.";
+      addInput.setAttribute("aria-invalid", "true");
+      return;
+    }
+    addError.textContent = "";
+    addInput.removeAttribute("aria-invalid");
+    state.recipients = state.recipients.concat([normalized]).sort();
+    addInput.value = "";
+    renderRecipients();
+    renderStrip();
+    say("Recipient added. Select Save settings to keep this change.");
+  };
+
+  addBtn.addEventListener("click", addRecipient);
+  // Enter in the address field adds a recipient instead of doing nothing.
+  addInput.addEventListener("keydown", e => {
+    if (e.key === "Enter") { e.preventDefault(); addRecipient(); }
+  });
+
+  saveBtn.addEventListener("click", () => {
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving...";
+    say("Saving...");
+    // Nothing is reported as saved until the API has confirmed it.
+    apiJson(emailSettingsPath(projectId), {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ enabled: state.enabled, recipients: state.recipients, events: state.events }),
+    }).then(res => {
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Save settings";
+      if (!res.ok || !res.body || !res.body.settings) {
+        say((res.body && res.body.error) || "Those settings could not be saved.", "error");
+        return;
+      }
+      // The server's normalized values win, so what is on screen afterwards is
+      // exactly what was persisted rather than what was typed.
+      state = {
+        enabled: Boolean(res.body.settings.enabled),
+        recipients: arr(res.body.settings.recipients),
+        events: arr(res.body.settings.events),
+      };
+      smtpConfigured = Boolean(res.body.emailConfigured);
+      draw();
+      say("Saved", "ok");
+    }).catch(() => {
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Save settings";
+      say("Those settings could not be saved.", "error");
+    });
+  });
+
+  testBtn.addEventListener("click", () => {
+    testBtn.disabled = true;
+    const previous = testBtn.textContent;
+    testBtn.textContent = "Sending...";
+    apiJson(emailSettingsPath(projectId) + "/test", { method: "POST" }).then(res => {
+      testBtn.disabled = false;
+      testBtn.textContent = previous;
+      const body = res.body || {};
+      if (res.ok && body.ok) {
+        say(body.message || "Email sent successfully.", "ok");
+        return;
+      }
+      // The backend owns this wording, so the screen can never show a raw SMTP
+      // message or anything the server chose not to return.
+      say(body.error || "Email could not be sent.", "error");
+    }).catch(() => {
+      testBtn.disabled = false;
+      testBtn.textContent = previous;
+      say("Email could not be sent. Check the email configuration and try again.", "error");
+    });
+  });
+
+  // --- Load, once ----------------------------------------------------------------
+  apiJson(emailSettingsPath(projectId)).then(res => {
+    if (!res.ok || !res.body || !res.body.settings) {
+      // An API that cannot be reached leaves an explicit error state. It never
+      // falls back to a plausible-looking empty configuration.
+      shell.innerHTML = "";
+      shell.appendChild(el("h2", null, "Email Notifications"));
+      shell.appendChild(el("p", "err", (res.body && res.body.error) || "Email settings could not be loaded."));
+      return;
+    }
+    events = arr(res.body.eventOptions);
+    // Canonical order comes from the API, so it cannot drift from the backend.
+    NOTIFICATION_EVENT_ORDER = events.map(option => option.type);
+    state = {
+      enabled: Boolean(res.body.settings.enabled),
+      recipients: arr(res.body.settings.recipients),
+      events: NOTIFICATION_EVENT_ORDER.filter(type => arr(res.body.settings.events).indexOf(type) !== -1),
+    };
+    smtpConfigured = Boolean(res.body.emailConfigured);
+    missingSmtp = arr(res.body.missingSmtpVariables);
+    draw();
+  });
+
+  return wrapper;
+}
+
+async function renderProjectPage(mount, projectId) {
+  const { ok, body } = await apiJson("/api/projects/" + encodeURIComponent(projectId));
+  if (!ok) {
+    mount.appendChild(el("p", "err", (body && body.error) || "That project could not be found."));
+    const back = el("a", null, "← All projects");
+    back.href = "/projects";
+    back.addEventListener("click", e => { e.preventDefault(); navigate("/projects"); });
+    mount.appendChild(back);
+    return;
+  }
+  const project = body.project;
+  const runs = arr(body.runs);
+  // Per-run lifecycle counts recorded by the engine, for the history table.
+  let findingSummaries = arr(body.findings);
+  // Per-run run-to-run change records, for the history table and Latest Changes.
+  let changeRecords = arr(body.changes);
+
+  const header = el("div", "card");
+  const h = el("h2", null, project.name);
+  header.appendChild(h);
+  header.appendChild(el("code", "projecturl", project.url));
+  const actions = el("div", "links");
+  const runBtn = el("button", "btn", "Run QA"); runBtn.type = "button";
+  runBtn.dataset.runBtn = "1"; runBtn.dataset.runLabel = "Run QA"; runBtn.id = "project-run-btn";
+  const toast = el("div", "toast"); toast.id = "toast";
+  const all = el("div");
+  all.appendChild(runBtn); all.appendChild(toast);
+  actions.appendChild(all);
+  const back = el("a", null, "← All projects");
+  back.href = "/projects";
+  back.addEventListener("click", e => { e.preventDefault(); navigate("/projects"); });
+  actions.appendChild(back);
+  header.appendChild(actions);
+  mount.appendChild(header);
+
+  // Live tracker + results live here while a project run is in flight.
+  const runPanel = el("div"); runPanel.id = "run-panel"; mount.appendChild(runPanel);
+  const resultPanel = el("div"); resultPanel.id = "result-panel"; mount.appendChild(resultPanel);
+
+  // QA schedule + its history. Reads only from the persisted schedule document.
+  const scheduleMount = el("div"); scheduleMount.id = "project-schedule-mount";
+  mount.appendChild(scheduleMount);
+
+  // Email notification settings. Configuration only - it reads and writes the
+  // project's own email settings and sends nothing on its own.
+  const emailMount = el("div"); emailMount.id = "project-email-mount";
+  mount.appendChild(emailMount);
+  emailMount.appendChild(emailSettingsSection(projectId));
+  const openScheduledRun = runId => {
+    if (runId) openHistoricalRun(runId, runPanel, resultPanel);
+  };
+  const loadSchedule = async () => {
+    scheduleMount.innerHTML = "";
+    const { ok, body } = await apiJson("/api/projects/" + encodeURIComponent(projectId) + "/schedule");
+    if (!ok) {
+      scheduleMount.appendChild(el("p", "err", (body && body.error) || "The QA schedule could not be loaded."));
+      return;
+    }
+    scheduleMount.appendChild(scheduleSection(projectId, body.schedule, toast, openScheduledRun));
+  };
+
+  const summaryMount = el("div"); summaryMount.id = "project-summary";
+  mount.appendChild(summaryMount);
+
+  const buildSummary = () => {
+    summaryMount.innerHTML = "";
+    const latest = card("Latest result");
+    const dl = el("dl", "kv");
+    addKV(dl, "Status", project.lastStatus || NOT_AVAILABLE);
+    addKV(dl, "Last run", formatTime(project.lastRunAt) || NOT_AVAILABLE);
+    addKV(dl, "Findings", project.lastFindingsCount == null ? NOT_AVAILABLE : String(project.lastFindingsCount));
+    addKV(dl, "Coverage", project.lastCoverageStatus || NOT_AVAILABLE);
+    const lastRun = runs.find(run => run.runId === project.lastRunId);
+    if (lastRun && lastRun.completedAt && lastRun.startedAt) {
+      addKV(dl, "Duration", formatMs(new Date(lastRun.completedAt).getTime() - new Date(lastRun.startedAt).getTime()) || NOT_AVAILABLE);
+    } else {
+      addKV(dl, "Duration", NOT_AVAILABLE);
+    }
+    addKV(dl, "Run id", project.lastRunId || NOT_AVAILABLE);
+    latest.appendChild(dl);
+    if (project.lastStatus) latest.appendChild(el("div", "status status-" + project.lastStatus, project.lastStatus));
+    if (project.lastRunId) {
+      const links = el("div", "links");
+      const openLatest = el("button", "btn secondary", "Open latest result"); openLatest.type = "button";
+      openLatest.addEventListener("click", () => openHistoricalRun(project.lastRunId, runPanel, resultPanel));
+      links.appendChild(openLatest);
+      latest.appendChild(links);
+    }
+    summaryMount.appendChild(latest);
+
+    // Latest Changes: a compact, honest account of what the most recent run
+    // changed relative to the run before it. Every line is a recorded count, and
+    // "no comparison available" is stated as itself rather than left blank.
+    const latestChange = changeRecords.length ? changeRecords[0] : null;
+    const changesCard = card("Latest Changes");
+    if (!latestChange) {
+      changesCard.appendChild(el("p", "muted", "No run-to-run comparison is available yet. A comparison needs two completed runs with readable reports."));
+    } else if (latestChange.availability === "UNAVAILABLE") {
+      const reason = el("p", "muted");
+      reason.appendChild(chip(latestChange.reason || "INSUFFICIENT_EVIDENCE", "muted"));
+      reason.appendChild(document.createTextNode(" " + (CHANGE_REASON_TEXT[latestChange.reason] || "Comparison unavailable") + "."));
+      changesCard.appendChild(reason);
+      if (latestChange.previousRunId) changesCard.appendChild(el("p", "muted", "Compared with run " + latestChange.previousRunId + "."));
+    } else {
+      const lines = arr(latestChange.highlights);
+      if (latestChange.availability === "PARTIAL") {
+        const partial = el("p", "muted");
+        partial.appendChild(chip(latestChange.reason || "ACCESS_BOUNDARY", "warn"));
+        partial.appendChild(document.createTextNode(" Only the access transition is reported for this pair of runs."));
+        changesCard.appendChild(partial);
+      }
+      changesCard.appendChild(el("p", "muted", "Compared with run " + (latestChange.previousRunId || NOT_AVAILABLE) + "."));
+      if (!lines.length) {
+        changesCard.appendChild(el("p", "nochange", "No material changes detected between the comparable runs."));
+      } else {
+        const list = el("div", "list");
+        for (const line of lines) list.appendChild(el("li", null, line));
+        changesCard.appendChild(list);
+      }
+      const viewFull = el("button", "btn secondary", "View full comparison"); viewFull.type = "button";
+      viewFull.addEventListener("click", () => openHistoricalRun(latestChange.currentRunId, runPanel, resultPanel));
+      const viewLinks = el("div", "links");
+      viewLinks.appendChild(viewFull);
+      changesCard.appendChild(viewLinks);
+    }
+    summaryMount.appendChild(changesCard);
+
+    const historyCard = card("Run history");
+    if (!runs.length) {
+      historyCard.appendChild(el("div", "empty", "No runs yet. Use Run QA above to test this website."));
+    } else {
+      // Each run's lifecycle counts come only from a recorded snapshot. A run
+      // with no comparable predecessor shows "not available" rather than zeros.
+      const summaryOf = runId => findingSummaries.find(item => item.runId === runId) || null;
+      // The same rule for the change record: a run with no recorded comparison
+      // has nothing to report, and the column says so instead of showing 0.
+      const changeOf = runId => changeRecords.find(item => item.currentRunId === runId) || null;
+      const table = el("table", "runstable");
+      const thead = el("thead");
+      const hr = el("tr");
+      for (const heading of ["Date", "Status", "Findings", "New", "Resolved", "Regressed", "Active", "Pages", "Flows", "Coverage", "Run"]) hr.appendChild(el("th", null, heading));
+      thead.appendChild(hr);
+      table.appendChild(thead);
+      const tbody = el("tbody");
+      for (const run of runs) {
+        const tr = el("tr");
+        tr.appendChild(el("td", null, formatTime(run.startedAt) || run.startedAt));
+        const statusCell = el("td");
+        if (run.status) statusCell.appendChild(statusChip(run.status));
+        else statusCell.appendChild(chip(run.state === "FAILED" ? "Run failed" : run.state, run.state === "FAILED" ? "fail" : "warn"));
+        tr.appendChild(statusCell);
+        tr.appendChild(el("td", null, run.findingsCount == null ? NOT_AVAILABLE : String(run.findingsCount)));
+        const summary = summaryOf(run.runId);
+        const available = Boolean(summary && summary.comparisonAvailable);
+        const count = key => {
+          if (!summary) return NOT_AVAILABLE;
+          if (!available) return NOT_AVAILABLE;
+          return String((summary.counts && summary.counts[key] != null ? summary.counts[key] : 0));
+        };
+        tr.appendChild(el("td", "c-new", count("new")));
+        tr.appendChild(el("td", "c-resolved", count("resolved")));
+        tr.appendChild(el("td", "c-regressed", count("regressed")));
+        tr.appendChild(el("td", "c-active", count("active")));
+        // Page and flow changes, only where a valid comparison was recorded.
+        const change = changeOf(run.runId);
+        const changeAvailable = Boolean(change && (change.availability === "AVAILABLE" || change.availability === "PARTIAL"));
+        tr.appendChild(el("td", null, !changeAvailable ? NOT_AVAILABLE : (change.pagesAdded + change.pagesRemoved ? "+" + change.pagesAdded + " / −" + change.pagesRemoved : "0")));
+        const flowTotal = changeAvailable ? change.flowsAdded + change.flowsRemoved + change.flowStatusChanges.length : null;
+        tr.appendChild(el("td", null, flowTotal == null ? NOT_AVAILABLE : String(flowTotal)));
+        tr.appendChild(el("td", null, run.coverageStatus || NOT_AVAILABLE));
+        const runCell = el("td");
+        if (run.hasResult) {
+          const open = el("button", "btn secondary", "Open results"); open.type = "button";
+          open.addEventListener("click", () => openHistoricalRun(run.runId, runPanel, resultPanel));
+          runCell.appendChild(open);
+        } else {
+          runCell.appendChild(el("span", "muted", run.error ? "No report was written" : NOT_AVAILABLE));
+        }
+        tr.appendChild(runCell);
+        tbody.appendChild(tr);
+      }
+      table.appendChild(tbody);
+      historyCard.appendChild(table);
+      const note = el("p", "muted", "New, Resolved, Regressed and Active count tracked findings against the project's previous comparable run. Pages and Flows show what changed in the pages and flows discovered by each run. A first run has nothing to compare, so those columns are not available.");
+      historyCard.appendChild(note);
+    }
+    summaryMount.appendChild(historyCard);
+  };
+
+  // -------------------------------------------------------------------------
+  // Tracked findings
+  // -------------------------------------------------------------------------
+  const findingsMount = el("div"); findingsMount.id = "project-findings";
+  mount.appendChild(findingsMount);
+
+  const LIFECYCLE_BUCKETS = [
+    ["REGRESSED", "Regressed", "fail"],
+    ["NEW", "New", "fail"],
+    ["ACTIVE", "Still active", "warn"],
+    ["RESOLVED", "Recently resolved", "ok"],
+  ];
+
+  const findingRow = item => {
+    const li = el("li");
+    const head = el("div", "runrow");
+    head.appendChild(el("span", "u", item.title || item.id));
+    const tags = el("span");
+    tags.appendChild(chip(item.severity, item.severity === "CRITICAL" || item.severity === "HIGH" ? "fail" : "muted"));
+    tags.appendChild(chip(LIFECYCLE_LABEL[item.status] || item.status, LIFECYCLE_CLASS[item.status] || "muted"));
+    head.appendChild(tags);
+    li.appendChild(head);
+    const meta = el("div", "muted");
+    meta.appendChild(document.createTextNode(
+      "First seen " + (formatTime(item.firstSeenAt) || item.firstSeenAt || NOT_AVAILABLE)
+      + " · last seen " + (formatTime(item.lastSeenAt) || item.lastSeenAt || NOT_AVAILABLE)
+      + " · seen in " + (item.occurrenceCount == null ? NOT_AVAILABLE : String(item.occurrenceCount)) + " run(s)"
+      + (item.code ? " · " + item.code : "")
+    ));
+    li.appendChild(meta);
+    const links = el("div", "links");
+    if (item.lastSeenRunId) {
+      const openRun = el("button", "btn secondary", "Open run"); openRun.type = "button";
+      openRun.addEventListener("click", () => openHistoricalRun(item.lastSeenRunId, runPanel, resultPanel));
+      links.appendChild(openRun);
+    }
+    links.appendChild(link("/api/projects/" + encodeURIComponent(projectId) + "/findings/" + encodeURIComponent(item.id) + "/history", "Lifecycle history"));
+    li.appendChild(links);
+    return li;
+  };
+
+  const loadFindings = async (query) => {
+    findingsMount.innerHTML = "";
+    const shell = card("Tracked findings");
+    shell.appendChild(el("p", "muted", "Findings this project keeps across runs, matched by semantic identity rather than by run-local numbering. No score or ranking is attached."));
+    const filters = el("div", "filters");
+    const statusInput = el("select");
+    const blank = el("option", null, "All lifecycle states"); blank.value = "";
+    statusInput.appendChild(blank);
+    for (const value of ["NEW", "ACTIVE", "REGRESSED", "RESOLVED"]) statusInput.appendChild(el("option", null, LIFECYCLE_LABEL[value] || value));
+    const severityInput = el("select");
+    const sblank = el("option", null, "All severities"); sblank.value = "";
+    severityInput.appendChild(sblank);
+    for (const value of ["CRITICAL", "HIGH", "MEDIUM", "LOW"]) severityInput.appendChild(el("option", null, value));
+    const searchInput = el("input"); searchInput.type = "search"; searchInput.placeholder = "Search tracked findings";
+    const apply = el("button", "btn secondary", "Apply filters"); apply.type = "button";
+    statusInput.value = (query && query.status) || "";
+    severityInput.value = (query && query.severity) || "";
+    searchInput.value = (query && query.search) || "";
+    const submit = () => {
+      const params = new URLSearchParams();
+      if (statusInput.value) params.set("status", statusInput.value);
+      if (severityInput.value) params.set("severity", severityInput.value);
+      if (searchInput.value.trim()) params.set("search", searchInput.value.trim());
+      loadFindings(params.toString());
+    };
+    apply.addEventListener("click", submit);
+    filters.appendChild(statusInput);
+    filters.appendChild(severityInput);
+    filters.appendChild(searchInput);
+    filters.appendChild(apply);
+    shell.appendChild(filters);
+
+    const loading = el("div", "loading", "Loading tracked findings…");
+    shell.appendChild(loading);
+    findingsMount.appendChild(shell);
+    const { ok, body } = await apiJson("/api/projects/" + encodeURIComponent(projectId) + "/findings" + (query ? "?" + query : ""));
+    shell.removeChild(loading);
+    if (!ok) {
+      shell.appendChild(el("p", "err", (body && body.error) || "Tracked findings could not be loaded."));
+      return;
+    }
+    const findings = arr(body.findings);
+    if (!findings.length) {
+      shell.appendChild(el("div", "empty", query ? "No tracked findings match these filters." : "No findings have been tracked yet. Findings appear here after a project run completes."));
+      return;
+    }
+    for (const [status, label, tone] of LIFECYCLE_BUCKETS) {
+      const items = findings.filter(item => item.status === status);
+      const h = el("h3", "changesgroup", label + " (" + items.length + ")");
+      shell.appendChild(h);
+      if (!items.length) { shell.appendChild(el("p", "muted", "None in this view.")); continue; }
+      const list = el("div", "list");
+      for (const item of items) list.appendChild(findingRow(item));
+      shell.appendChild(list);
+    }
+  };
+  loadFindings("");
+  reloadFindings = loadFindings;
+
+  // A finding notification links here with ?finding=<id>. Rather than inventing
+  // a new page, the existing project page shows that one tracked finding in full
+  // detail - including the recorded lifecycle history that decided the
+  // notification - above the normal tracked-findings list.
+  const openFindingFromQuery = async () => {
+    const wanted = new URLSearchParams(location.search).get("finding");
+    if (!wanted) return;
+    const detailMount = el("div"); detailMount.id = "notification-finding";
+    mount.insertBefore(detailMount, findingsMount);
+    const { ok, body } = await apiJson("/api/projects/" + encodeURIComponent(projectId) + "/findings/" + encodeURIComponent(wanted));
+    detailMount.innerHTML = "";
+    if (!ok) {
+      detailMount.appendChild(el("p", "err", (body && body.error) || "That finding could not be loaded."));
+      return;
+    }
+    const detail = el("div", "card notifdetail");
+    detail.appendChild(el("p", "muted", "Opened from a notification. This is the project's own tracked record for this finding."));
+    const finding = body.finding;
+    const head = el("div", "runrow");
+    head.appendChild(el("span", "u", finding.title || finding.id));
+    const tags = el("span");
+    tags.appendChild(chip(finding.severity, finding.severity === "CRITICAL" || finding.severity === "HIGH" ? "fail" : "muted"));
+    tags.appendChild(chip(LIFECYCLE_LABEL[finding.status] || finding.status, LIFECYCLE_CLASS[finding.status] || "muted"));
+    head.appendChild(tags);
+    detail.appendChild(head);
+    const meta = el("div", "muted");
+    meta.appendChild(document.createTextNode(
+      "First seen " + (formatTime(finding.firstSeenAt) || finding.firstSeenAt || NOT_AVAILABLE)
+      + " · last seen " + (formatTime(finding.lastSeenAt) || finding.lastSeenAt || NOT_AVAILABLE)
+      + " · seen in " + (finding.occurrenceCount == null ? NOT_AVAILABLE : String(finding.occurrenceCount)) + " run(s)"
+      + (finding.code ? " · " + finding.code : "")
+      + (finding.page ? " · " + finding.page : "")
+    ));
+    detail.appendChild(meta);
+
+    // The lifecycle events the engine actually recorded, oldest first. This is
+    // the evidence a resolution notification rests on, so it is shown as-is.
+    const events = arr(body.history).slice().sort((a, b) => String(a.at || "").localeCompare(String(b.at || "")));
+    if (events.length) {
+      detail.appendChild(el("h3", "changesgroup", "Recorded lifecycle"));
+      const list = el("ul", "lifecycle");
+      for (const event of events) {
+        const li = el("li");
+        li.appendChild(el("span", "muted", formatTime(event.at) || event.at || NOT_AVAILABLE));
+        li.appendChild(chip(LIFECYCLE_LABEL[event.status] || event.status, LIFECYCLE_CLASS[event.status] || "muted"));
+        if (event.observed === false) li.appendChild(chip("Not observed", "warn"));
+        if (event.runId) {
+          const openRun = el("button", "btn secondary", "Open that run"); openRun.type = "button";
+          openRun.addEventListener("click", () => openHistoricalRun(event.runId, runPanel, resultPanel));
+          li.appendChild(openRun);
+        }
+        list.appendChild(li);
+      }
+      detail.appendChild(list);
+    }
+    const links = el("div", "links");
+    links.appendChild(link("/api/projects/" + encodeURIComponent(projectId) + "/findings/" + encodeURIComponent(wanted) + "/history", "Lifecycle history"));
+    const dismiss = el("button", "btn secondary", "Close"); dismiss.type = "button";
+    dismiss.addEventListener("click", () => {
+      detailMount.remove();
+      navigate("/projects/" + encodeURIComponent(projectId));
+    });
+    links.appendChild(dismiss);
+    detail.appendChild(links);
+    detailMount.appendChild(detail);
+  };
+  openFindingFromQuery();
+
+  /** Re-reads the saved project so the summary reflects the finished run. */
+  const reloadSummary = async () => {
+    const again = await apiJson("/api/projects/" + encodeURIComponent(projectId));
+    if (!again.ok) return;
+    const fresh = again.body.project;
+    for (const key of ["lastRunId", "lastRunAt", "lastStatus", "lastFindingsCount", "lastCoverageStatus", "name", "url"]) {
+      if (fresh[key] !== undefined) project[key] = fresh[key];
+    }
+    runs.length = 0;
+    for (const run of arr(again.body.runs)) runs.push(run);
+    findingSummaries = arr(again.body.findings);
+    changeRecords = arr(again.body.changes);
+    buildSummary();
+    if (reloadFindings) await reloadFindings("");
+    await loadSchedule();
+  };
+  onRunCompleted = reloadSummary;
+  buildSummary();
+  await loadSchedule();
+
+  const footer = el("div", "footer");
+  footer.appendChild(el("span", null, "Projects organize runs. They do not change how QA is executed."));
+  mount.appendChild(footer);
+
+  runBtn.addEventListener("click", async () => {
+    clearToast();
+    if (busy) return;
+    busy = true;
+    setBusy(true);
+    try {
+      const res = await fetch("/api/projects/" + encodeURIComponent(projectId) + "/runs", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) { showProjectError(toast, res.status, (data && data.error) || "Could not start the run."); setBusy(false); return; }
+      activeRunId = data.run.runId;
+      renderRunPanel(data.run);
+      resultPanel.innerHTML = "";
+      schedulePoll(400);
+    } catch {
+      showError("Could not reach the QA server. Is the dashboard still running?");
+      setBusy(false);
+    }
+  });
+}
+
+/**
+ * Opens an already-finished run's results. This reads the artifact the engine
+ * wrote on that run — it never executes QA again.
+ */
+async function openHistoricalRun(runId, runPanel, resultPanel) {
+  const { ok, body } = await apiJson("/api/qa/runs/" + encodeURIComponent(runId));
+  if (!ok) { showError((body && body.error) || "That run is no longer available in this session."); return; }
+  const run = body.run;
+  renderRunPanel(run);
+  await loadResult(run);
+  if (resultPanel) resultPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// ---------------------------------------------------------------------------
+// Recent runs
+// ---------------------------------------------------------------------------
+async function refreshRecent() {
+  const body = document.getElementById("recent-body");
+  if (!body) return;
+  body.innerHTML = "";
+  let sessionRuns = [];
+  let history = { sites: [] };
+  try {
+    const [runsRes, historyRes] = await Promise.all([fetch("/api/qa/runs"), fetch("/api/history")]);
+    if (runsRes.ok) { const d = await runsRes.json(); sessionRuns = arr(d.runs); }
+    if (historyRes.ok) history = await historyRes.json();
+  } catch { /* show what we can */ }
+
+  if (sessionRuns.length) {
+    body.appendChild(el("div", "muted", "This session — full results available"));
+    const ul = el("ul", "list");
+    for (const run of sessionRuns) {
+      const li = el("li");
+      const r = el("div", "runrow");
+      const left = el("div");
+      left.appendChild(el("div", "u", run.url));
+      const bits = [formatTime(run.startedAt) || run.startedAt];
+      bits.push(run.state === "COMPLETED" ? (run.qaStatus || "COMPLETED") : run.state);
+      if (run.completedAt && run.startedAt) bits.push("in " + formatMs(new Date(run.completedAt).getTime() - new Date(run.startedAt).getTime()));
+      if (run.historyRunId) bits.push("persisted");
+      left.appendChild(el("div", "sub", bits.join(" · ")));
+      r.appendChild(left);
+      const right = el("div");
+      if (run.state === "COMPLETED") {
+        right.appendChild(statusChip(run.qaStatus));
+        const open = el("button", "btn secondary", "View results");
+        open.type = "button";
+        open.style.marginLeft = "8px";
+        open.addEventListener("click", () => {
+          activeRunId = run.runId;
+          renderRunPanel(run);
+          loadResult(run);
+          const top = document.getElementById("result-panel");
+          if (top) top.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+        right.appendChild(open);
+      } else {
+        right.appendChild(chip(run.state, run.state === "FAILED" ? "fail" : "warn"));
+        if (run.error) right.appendChild(chip(run.error.split("\n")[0].slice(0, 70), "muted"));
+      }
+      r.appendChild(right);
+      li.appendChild(r);
+      ul.appendChild(li);
+    }
+    body.appendChild(ul);
+  }
+
+  const persisted = [];
+  for (const site of arr(history.sites)) for (const run of arr(site.runs)) persisted.push(run);
+  persisted.sort((a, b) => String(b.completedAt || "").localeCompare(String(a.completedAt || "")));
+  if (persisted.length) {
+    const note = el("div", "muted", "Persisted history — summary snapshots only");
+    note.appendChild(el("div", "muted", "Archived runs keep a compact snapshot, not the full report. Open one in the evidence explorer for its findings."));
+    body.appendChild(note);
+    const ul = el("ul", "list");
+    for (const run of persisted.slice(0, 8)) {
+      const li = el("li");
+      const r = el("div", "runrow");
+      const left = el("div");
+      left.appendChild(el("div", "u", run.runId));
+      left.appendChild(el("div", "sub", (formatTime(run.completedAt) || "unknown time") + " · " + num(run.findingCount) + " finding(s)"));
+      r.appendChild(left);
+      r.appendChild(link("/dashboard#/runs/" + encodeURIComponent(run.runId) + "/findings", "View evidence →"));
+      li.appendChild(r);
+      ul.appendChild(li);
+    }
+    body.appendChild(ul);
+  }
+
+  if (!sessionRuns.length && !persisted.length) body.appendChild(el("div", "empty", "No runs yet. Start one above."));
+}
+
+// ---------------------------------------------------------------------------
+// Boot
+// ---------------------------------------------------------------------------
+renderRoute();
+</script>
+</body>
+</html>
