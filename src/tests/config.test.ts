@@ -238,6 +238,39 @@ test("an empty baseline section still yields no policy and no pinned path", () =
   assert.equal(resolveQaConfig(loaded.config).baselinePath, null);
 });
 
+// --- Phase 13: config-pinned performance budgets (perf.budgets) ---------------
+
+test("perf.budgets is accepted, trimmed, and resolved into QaOptions", () => {
+  const loaded = loadFrom(JSON.stringify({ perf: { budgets: "  perf.budgets.json  " } }));
+  assert.equal(loaded.config.perf?.budgets, "perf.budgets.json", "path is trimmed");
+  assert.equal(resolveQaConfig({ perf: { budgets: "perf.budgets.json" } }).perfBudgetsPath, "perf.budgets.json");
+  assert.equal(resolveQaConfig({}).perfBudgetsPath, null, "default is no budgets file");
+  assert.equal(parseArgs(["https://qa.test/en"], { perf: { budgets: "perf.budgets.json" } })?.perfBudgetsPath, "perf.budgets.json");
+  assert.equal(parseArgs(["https://qa.test/en"])?.perfBudgetsPath, null);
+});
+
+test("CLI --perf-budgets overrides perf.budgets config", () => {
+  const options = parseArgs(["https://qa.test/en", "--perf-budgets", "other.budgets.json"], { perf: { budgets: "perf.budgets.json" } });
+  assert.equal(options?.perfBudgetsPath, "other.budgets.json");
+  // The flag never needs the file at parse time: it is validated before the
+  // pipeline runs, so argument parsing stays pure.
+  assert.equal(parseArgs(["https://qa.test/en", "--perf-budgets", "does-not-exist.json"])?.perfBudgetsPath, "does-not-exist.json");
+});
+
+test("invalid perf.budgets values are hard errors that name the property", () => {
+  assert.throws(() => loadFrom(JSON.stringify({ perf: { budgets: "" } })), /"perf\.budgets" must be a non-empty file path/);
+  assert.throws(() => loadFrom(JSON.stringify({ perf: { budgets: "   " } })), /"perf\.budgets" must be a non-empty file path/);
+  assert.throws(() => loadFrom(JSON.stringify({ perf: { budgets: 7 } })), /"perf\.budgets" must be a non-empty file path/);
+  assert.throws(() => loadFrom(JSON.stringify({ perf: { budget: "x.json" } })), /unknown property "perf\.budget"/);
+  assert.throws(() => loadFrom(JSON.stringify({ perf: true })), /"perf" must be an object/);
+});
+
+test("an empty perf section yields no budgets path", () => {
+  const loaded = loadFrom(JSON.stringify({ perf: {} }));
+  assert.deepEqual(loaded.config.perf, {});
+  assert.equal(resolveQaConfig(loaded.config).perfBudgetsPath, null);
+});
+
 // --- Stage enablement: resolved + REAL effect (spec §17) --------------------
 
 test("stage toggles resolve into QaOptions (and default to on)", () => {

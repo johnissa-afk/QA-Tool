@@ -40,6 +40,7 @@ npm run scan -- --help
 | `--timeout <ms>` | Page navigation timeout; default is `30000`. |
 | `--output <path>` | JSON report location; default is `reports/qa-report.json`. The HTML report uses the same basename. |
 | `--concurrency <n>` | Maximum concurrent link checks; default is `5`. |
+| `--perf-budgets <path>` | JSON performance budgets (e.g. `{"lcp": 2500}`) written into the report as `perf-budget-*` findings. The same file can gate a QA run — see Phase 13. |
 
 ## Authentication
 
@@ -93,7 +94,7 @@ npm run qa -- https://example.com
 npm run qa -- --report reports/qa-report.json --execute
 ```
 
-`qa` turns a scan report into a `QaAnalysis`: severity-rated findings with evidence, user-flow detection, intent- and priority-labeled scenarios, a release gate (`FAIL` if any critical finding, `REVIEW` if any high-severity, else `PASS`), finding lifecycle + verification sections, and a 14-section HTML report. It writes `reports/qa-analysis.json` and `reports/qa-analysis.html`. `--execute` runs the verification executor against the live page and attaches the outcomes to `analysis.verifications` and `analysis.execution`.
+`qa` turns a scan report into a `QaAnalysis`: severity-rated findings with evidence, user-flow detection, intent- and priority-labeled scenarios, a release gate (`FAIL` if any critical finding, `REVIEW` if any high-severity, else `PASS`), finding lifecycle + verification sections, and a 15-section HTML report. It writes `reports/qa-analysis.json` and `reports/qa-analysis.html`. `--execute` runs the verification executor against the live page and attaches the outcomes to `analysis.verifications` and `analysis.execution`.
 
 The analysis is fully deterministic with no API key. When `AI_API_KEY`/`AI_API_URL`/`AI_MODEL` are configured (see `.env.example`), an OpenAI-compatible provider offers bounded enhancements (recommendation wording, confidence, priority, severity at most one level from the rule-based value) — it can never add or remove findings, flows, or scenarios, and never invents evidence.
 
@@ -104,6 +105,7 @@ The analysis is fully deterministic with no API key. When `AI_API_KEY`/`AI_API_U
 | `--max-depth <n>` | Maximum link depth from the start page; default is `3`. |
 | `--max-flows <n>` | Maximum discovered user flows reported; default is `20`. |
 | `--max-flow-steps <n>` | Maximum steps kept per flow; default is `6`. |
+| `--perf-budgets <path>` | JSON file of performance budgets enforced during this run (Phase 13). |
 
 ## Verification (EXECUTOR)
 
@@ -455,6 +457,7 @@ The policy is driven by the existing status model (`PASS` < `REVIEW` < `FAIL`, w
 | `FAIL` | exit 1 | exit 1 |
 
 - `--fail-on` implies `--ci`. The default policy is `failed`.
+- **A performance-budget breach is an ordinary policy failure, not a new category (Phase 13).** A metric over its declared budget becomes a `CRITICAL` finding, so the status model above turns it into `FAIL` and therefore exit `1`. A budgets file that is missing, unreadable, or malformed is a configuration failure: exit `1` locally, exit `2` under `--ci`. No new exit codes.
 - Invalid values (for example `--fail-on invalid`) fail loudly with a clear CLI error — there is no silent fallback.
 - Exit `2` is reserved for infrastructure/runtime/tooling failures: browser launch failure, network/runtime failure, an uncaught pipeline exception, invalid usage, or a missing build/dependency. The policy itself only ever returns `0` or `1`.
 - Expected **skips** (no `--baseline`, first-run history, an unavailable optional phase) are part of a completed run's result and are never turned into infrastructure failures.
@@ -698,10 +701,10 @@ QA artifacts are deterministic where it matters, isolated, and safe to reproduce
 
 Every way a QA/CI run can end is classified into one stable failure-mode **category**, and each category maps to exactly one exit code. The classifier lives in `src/qa/failure-mode.ts` as pure, table-driven logic with no I/O; the CLI prints a machine-readable `Failure mode: <category> → exit <n>.` line on CI runs and on aborts. **The public report schema is unchanged** — classification is internal and written to the terminal only.
 
-- **Categories.** `success`, `configuration`, `baseline-verification`, `policy`, `gate`, `rotation`, `infrastructure`. The project's *regression* decision (Phase 9 NEW/REGRESSION findings) is the `gate` category; the non-blocking status-only finding is the `policy` category; stale-gate rotations from `--baseline-max-age` are `rotation`; a phase that threw before completing (load, execute, compare, verdict, report) is `infrastructure`.
+- **Categories.** `success`, `configuration`, `baseline-verification`, `policy`, `gate`, `rotation`, `infrastructure`. The project's *regression* decision (Phase 9 NEW/REGRESSION findings) is the `gate` category; the non-blocking status-only finding is the `policy` category; stale-gate rotations from `--baseline-max-age` are `rotation`; a phase that threw before completing (load, execute, compare, verdict, report) is `infrastructure`. And neither was one for a performance-budget breach (Phase 13): it is an ordinary critical finding, not a new category.
 - **Exit-code contract** (consistent with Phase 11A). `success` → **0**; `gate`/`policy`/`rotation` → **1**; `configuration` → **1 locally, 2 with `--ci`** (pre-existing behavior preserved); `baseline-verification` and `infrastructure` → **2**. The standalone `verify` subcommand keeps its dedicated 0/2 contract.
 - **Precedence (first match wins).** `infrastructure` > `configuration` > `baseline-verification` > `gate` > `policy` > `rotation` > `success`. Consequences: a baseline check never downgrades to a gate/regression call even when findings are NEW (it keeps the hard exit 2); infrastructure errors are never masked by a regression, gate, or rotation; a completed run that passes the gate can never read as success if an earlier phase already signalled a hard failure. Combined config+baseline locally resolves to `configuration`/1 by precedence, matching the top-level catch's 1/2-by-ciMode behavior.
-- **Abort classification.** `classifyThrownError` buckets thrown messages by stable patterns: configuration messages (invalid `qa.config.json`, missing required option values, invalid `--fail-on`/gate severity/`--baseline-max-age`, artifact-collision guards, missing required start URL/report path, non-positive numbers, non-integer `--port`), baseline-verification messages (`Invalid baseline …`, failed digest verification, changed-after-publish), and everything else falls through to `infrastructure`. The same classification drives the exit code (0 never exits on an aborted run; `1` locally, `2` with `--ci`).
+- **Abort classification.** `classifyThrownError` buckets thrown messages by stable patterns: configuration messages (invalid `qa.config.json`, missing required option values, invalid `--fail-on`/gate severity/`--baseline-max-age`, an invalid performance budgets file, artifact-collision guards, missing required start URL/report path, non-positive numbers, non-integer `--port`), baseline-verification messages (`Invalid baseline …`, failed digest verification, changed-after-publish), and everything else falls through to `infrastructure`. The same classification drives the exit code (0 never exits on an aborted run; `1` locally, `2` with `--ci`).
 - **UNKNOWN-safe rotation.** A legacy baseline that superseded the gate (findings kept `UNKNOWN` without context) continues to pass in CI (`success`/0) as long as nothing else failed, and `UNKNOWN` findings never flip a run to `gate`/regression — only genuine NEW/REGRESSION findings do.
 - **Single source of truth.** `decideCiContractExit` (Phase 11A) now delegates to `classifyRunOutcome`, so the completed-run CI verdict, the local verdict, the printed categories, and the tests all agree on one table rather than parallel copies.
 - **Tests** in `src/tests/failure-mode.test.ts`: a pure `PURE_MATRIX` (every category plus the precedence collisions: baseline+regression, baseline+gate, infrastructure+regression, regression+rotation, gate+rotation, combined config+baseline locally), an agreement sweep against `decideCiContractExit`, an exhaustive no-accidental-0 / mapping-consistency sweep over all flag combinations + ciMode, a `THROWN_MATRIX` for abort classification, and a spawned CLI matrix covering clean, NEW-HIGH regression, gate-disabled-with-failures, rotation-fresh/stale (CI and local), missing/malformed/structurally-invalid/tampered baselines, malformed config, invalid baseline/max-age, infrastructure, BE-colocated `--baseline`+`--output`, and UNKNOWN+cases — each asserting exit code, the `Failure mode:` line, continuation, and artifact output. Configuration local-exit-1/CI-exit-2 and report-configuration-snapshot stability are asserted separately.
@@ -724,6 +727,28 @@ The QA step does not use `continue-on-error` or `if: always()`, so its exit code
 
 No baseline is created or overwritten in CI. Noor credentials and optional AI settings come only from GitHub Secrets through environment variables; they are not hardcoded, printed, or included in the artifact inventory. Static workflow checks live in `src/tests/ci-integration.test.ts`.
 
+### Phase 13 — Performance budgets in the QA/CI path
+
+```powershell
+npm run qa -- https://example.com --execute --perf-budgets perf.budgets.json --ci
+npm run qa -- --report reports/qa-report.json --perf-budgets perf.budgets.json
+```
+
+The scanner has always been able to record Web Vitals, and `npm run scan` has had its own `--perf-budgets` flag, but neither could stop a release: the budgets never reached the QA analysis, the HTML report, or the CI exit decision. Phase 13 closes that gap with the existing architecture — no new exit code, no new failure category, no new severity level.
+
+- **One budgets file, six metrics.** `ttfb`, `fcp`, `lcp`, `cls`, `domContentLoaded`, `loadEvent` (milliseconds, except `cls` which is a unitless ratio). Any subset may be declared; unknown keys, negative values, malformed JSON, and unreadable/missing files are rejected.
+
+  ```json
+  { "ttfb": 600, "fcp": 1800, "lcp": 2500, "cls": 0.1 }
+  ```
+- **Loud configuration, never a silent pass.** A budgets file that cannot be loaded raises `Invalid performance budgets file "<path>": …`, which the Phase 11C classifier maps to `configuration` — exit `1` locally, exit `2` under `--ci`, the same contract every other configuration problem already has. A UTF-8 BOM written by Windows tooling is tolerated rather than reported as broken JSON.
+- **Applied once, in the pipeline.** Budgets are evaluated after the scan (and before analysis) rather than inside the scanner, so the same file also gates a reused `--report` artifact and stays unit-testable without a browser. The scanner itself is unchanged apart from one bug fix: Chromium does not publish Largest Contentful Paint entries to the passive timeline, so `getEntriesByType` never returned them and every LCP value was `null`. A buffered `PerformanceObserver` now captures them (with an honest fallback to `null` if the page produced no LCP candidate).
+- **A breach is just a finding.** Each breach adds a `FAIL` issue coded `perf-budget-<metric>` in the new `performance` finding domain, with a `Performance budget exceeded: <METRIC>` title and `CRITICAL` severity — so the existing rubric makes the status `FAIL`, the Phase 8C gate exits `1`, and the Phase 11C line reads `Failure mode: policy → exit 1.`. Re-applying budgets is idempotent, and `summary` counters are recomputed so the artifact never claims 0 failures while carrying a FAIL issue.
+- **Untested means unjudged.** When an access prerequisite stopped the normal scan, budgets are not evaluated (`Performance budgets: not evaluated — normal QA scan did not run (…)`) and no finding is invented, preserving the rule that an untested target never increases the finding count. Metrics the scan could not measure are likewise not judged.
+- **Report.** The HTML report is now 15 sections, with a `Performance` section showing every measured metric plus a `Declared budgets exceeded` table when there is a breach.
+
+Tests in `src/tests/perf-budgets.test.ts` cover loud loading (missing/malformed/unknown key/negative/BOM), application and idempotence, honest summary counters, unavailable metrics, classification and domain/title mapping, the rendered Performance section, and spawned-CLI behavior exactly as CI runs it: breach + `--ci` → `1` with `Failure mode: policy → exit 1.`, satisfied budgets → `0`, a missing budgets file → `2` with `--ci` and `1` without, no budgets file at all → byte-for-byte the pre-Phase-13 verdict, and an access-blocked report → not evaluated with zero findings. `perf.budgets` config parsing and CLI precedence live in `src/tests/config.test.ts`.
+
 ## Development
 
 ```powershell
@@ -743,7 +768,7 @@ src/
   reporter.ts            JSON and HTML artifact generation
   test-generator.ts      scenario generation (safe/review/high-risk split)
   playwright-generator.ts  Playwright spec generation for generated-tests.ts
-  qa-cli.ts              QA analysis orchestrator (qa command; --baseline-max-age rotation & CI verdict; Phase 11A contract wiring; Phase 11B artifact-boundary guards + inventory block; Phase 11C failure-mode classification lines)
+  qa-cli.ts              QA analysis orchestrator (qa command; --baseline-max-age rotation & CI verdict; Phase 11A contract wiring; Phase 11B artifact-boundary guards + inventory block; Phase 11C failure-mode classification lines; Phase 13 --perf-budgets load + apply)
   ai/
     severity.ts          deterministic severity/confidence rubric
     analysis.ts          finding builder with evidence refs
@@ -816,17 +841,18 @@ intelligence/
 qa/
       result.ts            Phase 8A: deterministic QA RESULT block + coverage label + queue counts
       ci-policy.ts         Phase 8C: pure CI exit policy (status ranks, --fail-on parsing, exit decision)
-      config.ts            Phase 8E/10D/11: optional qa.config.json loader + validation + resolved defaults (incl. baseline.maxAge, baseline.path)
+      config.ts            Phase 8E/10D/11/13: optional qa.config.json loader + validation + resolved defaults (incl. baseline.maxAge, baseline.path, perf.budgets)
       gate.ts              Phase 9: pure baseline regression gate (evidence → deterministic policy → verdict)
 baseline.ts          Phase 10: verified baseline loading (structure validation + sha256 integrity + provenance + age) + offline `verify` baseline verification + rotation policy (&max-age) helpers
       ci-contract.ts        Phase 11A: canonical CI command + 0/1/2 exit-code contract + decideCiContractExit
       determinism.ts        Phase 11B: pure deterministic normalization (mask runtime timestamps/durations/run ids/machine paths; canonical key-stable artifact keys)
       artifacts.ts          Phase 11B: pure artifact inventory for a run (relative-only paths, kind order, summary, renderer)
+      perf.ts               Phase 13: loud performance-budgets loader + apply to report (issues + summary counters) + budget description
     dashboard/
     server.ts            Phase 8B/10C/10D: zero-dependency loopback-only dashboard server (read-only artifact API + verified baseline state + rotation staleness)
       evidence.ts          Phase 8D: evidence views (occurrence resolution, verification, root cause, history) over report|snapshot artifacts
       index.html           static single-file dashboard UI (dashboard + evidence explorer; traverses /api/state and /api/runs/*/findings)
-    tests/                 unit tests for pure behavior (incl. ci-contract.test.ts — Phase 11A spawned-CLI 0/1/2 contract; determinism.test.ts + artifacts.test.ts + phase11b.test.ts — Phase 11B; failure-mode.test.ts — Phase 11C; ci-integration.test.ts — Phase 11D workflow checks)
+    tests/                 unit tests for pure behavior (incl. ci-contract.test.ts — Phase 11A spawned-CLI 0/1/2 contract; determinism.test.ts + artifacts.test.ts + phase11b.test.ts — Phase 11B; failure-mode.test.ts — Phase 11C; ci-integration.test.ts — Phase 11D workflow checks; perf-budgets.test.ts — Phase 13 budgets + spawned-CLI breach/exit matrix)
 .github/
      workflows/qa-ci.yml    Phase 11D: canonical QA gate workflow (exit code drives the job, reports uploaded after failures)
 ```

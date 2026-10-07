@@ -51,6 +51,12 @@ export type QaConfig = {
    * repeating the flag on every invocation. Relative to the working directory.
    */
   baseline?: { maxAge?: string; path?: string };
+  /**
+   * Phase 13 — performance budgets: path to the JSON budget file, the same
+   * file `--perf-budgets` takes (so CI can pin budgets once instead of editing
+   * the workflow). Relative to the working directory. The CLI flag wins.
+   */
+  perf?: { budgets?: string };
 };
 
 /** Result of locating + loading the configuration file. */
@@ -78,6 +84,8 @@ export type ResolvedQaConfig = {
   baselineMaxAge: string | null;
   /** Phase 11: default baseline artifact path (`--baseline`), or null. */
   baselinePath: string | null;
+  /** Phase 13: performance budgets file (`--perf-budgets`), or null. */
+  perfBudgetsPath: string | null;
 };
 
 export const QA_CONFIG_DEFAULTS: ResolvedQaConfig = {
@@ -92,6 +100,7 @@ export const QA_CONFIG_DEFAULTS: ResolvedQaConfig = {
   gateMinSeverity: GATE_DEFAULT_MIN_SEVERITY,
   baselineMaxAge: null,
   baselinePath: null,
+  perfBudgetsPath: null,
 };
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
@@ -128,7 +137,7 @@ function parseStage(source: string, section: string, raw: unknown): QaStageConfi
  */
 export function parseQaConfig(raw: unknown, source: string): QaConfig {
   if (!isPlainObject(raw)) configError(source, "the configuration must be a JSON object.");
-  assertOnlyKeys(source, raw, ["crawl", ...STAGE_SECTIONS, "ci", "baseline"], "");
+  assertOnlyKeys(source, raw, ["crawl", ...STAGE_SECTIONS, "ci", "baseline", "perf"], "");
 
   const config: QaConfig = {};
 
@@ -199,6 +208,20 @@ export function parseQaConfig(raw: unknown, source: string): QaConfig {
     if (config.baseline === undefined) config.baseline = {};
   }
 
+  if (raw.perf !== undefined) {
+    if (!isPlainObject(raw.perf)) configError(source, `"perf" must be an object (e.g. { "budgets": "perf.budgets.json" }).`);
+    assertOnlyKeys(source, raw.perf, ["budgets"], "perf.");
+    if (raw.perf.budgets !== undefined) {
+      const value = raw.perf.budgets;
+      if (typeof value !== "string" || value.trim() === "") {
+        configError(source, `"perf.budgets" must be a non-empty file path (e.g. "perf.budgets.json").`);
+      }
+      config.perf = { budgets: value.trim() };
+    } else {
+      config.perf = {};
+    }
+  }
+
   return config;
 }
 
@@ -255,5 +278,6 @@ export function resolveQaConfig(config: QaConfig = {}): ResolvedQaConfig {
     gateMinSeverity: config.ci?.gateMinSeverity ?? QA_CONFIG_DEFAULTS.gateMinSeverity,
     baselineMaxAge: config.baseline?.maxAge ?? QA_CONFIG_DEFAULTS.baselineMaxAge,
     baselinePath: config.baseline?.path ?? QA_CONFIG_DEFAULTS.baselinePath,
+    perfBudgetsPath: config.perf?.budgets ?? QA_CONFIG_DEFAULTS.perfBudgetsPath,
   };
 }

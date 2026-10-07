@@ -132,7 +132,7 @@ async function navigateWithRetry(page: Page, url: string, timeout: number, waitU
 /** Collects core Web Vitals + navigation timing via the browser's Performance API. */
 async function collectMetrics(page: Page): Promise<PerformanceMetrics> {
   try {
-    return await page.evaluate(() => {
+    return await page.evaluate(() => new Promise<PerformanceMetrics>(resolve => {
       const navEntries = performance.getEntriesByType("navigation") as PerformanceNavigationTiming[];
       const nav = navEntries[0];
       const lcpEntries = performance.getEntriesByType("largest-contentful-paint");
@@ -144,7 +144,7 @@ async function collectMetrics(page: Page): Promise<PerformanceMetrics> {
         cls += entry.value;
       }
       const navStart = nav ? nav.startTime : 0;
-      return {
+      const snapshot = {
         ttfb: nav ? nav.responseStart - navStart : null,
         fcp: fcpEntry ? fcpEntry.startTime : null,
         lcp: lcpEntries.length > 0 ? (lcpEntries[lcpEntries.length - 1] as unknown as { startTime: number }).startTime : null,
@@ -152,7 +152,28 @@ async function collectMetrics(page: Page): Promise<PerformanceMetrics> {
         domContentLoaded: nav ? nav.domContentLoadedEventEnd - navStart : null,
         loadEvent: nav ? nav.loadEventEnd - navStart : null,
       };
-    });
+      if (snapshot.lcp !== null) return resolve(snapshot);
+
+      // Chromium does not publish Largest Contentful Paint entries to the
+      // passive timeline, so `getEntriesByType` above always returns [] and LCP
+      // would be reported as null forever — which silently disables every LCP
+      // performance budget. A buffered PerformanceObserver replays those
+      // entries; if the page produced no LCP candidate the fallback timer keeps
+      // the honest null.
+      try {
+        let observer: PerformanceObserver;
+        observer = new PerformanceObserver(list => {
+          const entries = list.getEntries() as unknown as Array<{ startTime: number }>;
+          if (entries.length === 0) return;
+          observer.disconnect();
+          resolve({ ...snapshot, lcp: entries[entries.length - 1].startTime });
+        });
+        observer.observe({ type: "largest-contentful-paint", buffered: true });
+        setTimeout(() => { observer.disconnect(); resolve(snapshot); }, 300);
+      } catch {
+        resolve(snapshot);
+      }
+    }));
   } catch {
     return { ttfb: null, fcp: null, lcp: null, cls: null, domContentLoaded: null, loadEvent: null };
   }

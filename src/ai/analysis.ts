@@ -42,6 +42,12 @@ const DOMAIN_BY_CODE: Record<string, FindingDomain> = {
   "console-network-error": "console",
   "console-third-party-error": "console",
   "page-error": "console",
+  "perf-budget-ttfb": "performance",
+  "perf-budget-fcp": "performance",
+  "perf-budget-lcp": "performance",
+  "perf-budget-cls": "performance",
+  "perf-budget-domContentLoaded": "performance",
+  "perf-budget-loadEvent": "performance",
 };
 
 export const domainFor = (code: string): FindingDomain => DOMAIN_BY_CODE[code] ?? "robustness";
@@ -71,6 +77,12 @@ const LABEL_BY_CODE: Record<string, string> = {
   "screenshot-unavailable": "Screenshot unavailable",
   "hidden-interactive-element": "Hidden interactive element",
   "disabled-interactive-element": "Disabled interactive element",
+  "perf-budget-ttfb": "Performance budget exceeded: TTFB",
+  "perf-budget-fcp": "Performance budget exceeded: FCP",
+  "perf-budget-lcp": "Performance budget exceeded: LCP",
+  "perf-budget-cls": "Performance budget exceeded: CLS",
+  "perf-budget-domContentLoaded": "Performance budget exceeded: DOM Content Loaded",
+  "perf-budget-loadEvent": "Performance budget exceeded: Load Event",
 };
 
 export const labelFor = (code: string): string => LABEL_BY_CODE[code] ?? code;

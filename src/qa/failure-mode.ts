@@ -130,6 +130,10 @@ const CONFIG_ERROR_PATTERNS: readonly RegExp[] = [
   /A URL or --report path is required/,
   /must be a positive number/,
   /--port must be an integer/,
+  // Phase 13: a missing/malformed/unknown-key performance budgets file is a
+  // configuration failure (1 locally, 2 with --ci) — never a silent pass and
+  // never an infrastructure failure.
+  /^Invalid performance budgets file/,
 ];
 
 const BASELINE_ERROR_PATTERNS: readonly RegExp[] = [

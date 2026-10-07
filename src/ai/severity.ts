@@ -1,4 +1,5 @@
 import { Issue } from "../types.js";
+import { PERF_METRIC_LABELS, isPerfBudgetCode, perfBudgetMetricOf } from "../perf-budgets.js";
 import { Confidence, Severity } from "./types.js";
 
 // ---------------------------------------------------------------------------
@@ -49,6 +50,21 @@ export function classifyIssue(issue: Issue, ctx: SeverityContext): SeverityVerdi
   const code = issue.code;
   const element = issue.element;
   const visible = element?.visible !== false && element?.enabled !== false;
+
+  // Phase 13: a performance-budget breach violates a threshold the team wrote
+  // down. Exceeding it is a release-blocking requirement violation, so it is
+  // CRITICAL and the run reads FAIL under the default --fail-on failed policy:
+  // a budget that could pass silently would not be a gate.
+  if (isPerfBudgetCode(code)) {
+    const metric = PERF_METRIC_LABELS[perfBudgetMetricOf(code) ?? "lcp"];
+    return {
+      severity: "CRITICAL",
+      confidence: "high",
+      rationale: `${issue.message}. The ${metric} was compared against a performance budget declared for this QA target and exceeded it.`,
+      recommendation: `Bring ${metric} back within its declared budget, or raise the threshold in the performance budgets file as an explicit, reviewed decision - never by ignoring the breach.`,
+      userImpact: `Users experience a ${metric} worse than the level the team agreed to ship.`,
+    };
+  }
 
   switch (code) {
     case "access-prerequisite":

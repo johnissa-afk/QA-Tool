@@ -10,6 +10,24 @@ export const PERF_METRIC_LABELS: Record<keyof PerfBudgets, string> = {
   loadEvent: "Load Event",
 };
 
+/**
+ * Issue-code prefix for a performance-budget breach. Shared by the scanner
+ * (which emits the issue), the QA pipeline (which may apply a budget file to a
+ * report), the severity rubric, and the HTML report — so the four can never
+ * disagree about what a budget breach is.
+ */
+export const PERF_BUDGET_CODE_PREFIX = "perf-budget-";
+
+/** True when an issue code is a performance-budget breach. */
+export const isPerfBudgetCode = (code: string): boolean => code.startsWith(PERF_BUDGET_CODE_PREFIX);
+
+/** The metric key behind a `perf-budget-<metric>` issue code, or null. */
+export function perfBudgetMetricOf(code: string): keyof PerfBudgets | null {
+  if (!isPerfBudgetCode(code)) return null;
+  const key = code.slice(PERF_BUDGET_CODE_PREFIX.length);
+  return key in PERF_METRIC_LABELS ? (key as keyof PerfBudgets) : null;
+}
+
 function parseNumber(value: unknown, key: string, source: string): number {
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
     throw new Error(`Invalid ${source}: "${key}" must be a non-negative number (received ${JSON.stringify(value)}).`);

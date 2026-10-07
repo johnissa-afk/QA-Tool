@@ -43,6 +43,7 @@ import { CANONICAL_CI_COMMAND, CI_CONTRACT_SUMMARY } from "./qa/ci-contract.js";
 import { classifyRunOutcome, classifyThrownError, formatFailureModeLine } from "./qa/failure-mode.js";
 import { BASELINE_VERIFY_EXIT_FAILURE, BASELINE_VERIFY_EXIT_OK, baselineMaxAgeLabel, baselineMetaPathOf, baselineStalenessOf, formatBaselineAge, formatBaselineVerification, loadBaseline, parseBaselineMaxAge, verifyBaseline } from "./qa/baseline.js";
 import { QA_CONFIG_FILENAME, QaConfig, loadQaConfig, resolveQaConfig } from "./qa/config.js";
+import { applyPerfBudgets, describePerfBudgets, loadQaPerfBudgets } from "./qa/perf.js";
 import { buildArtifactInventory, renderArtifactInventory } from "./qa/artifacts.js";
 import { createStageEventEmitter, QaStage, QaStageEmitter, STAGE_EVENT_FILENAME } from "./qa/stages.js";
 import { atomicWriteText } from "./atomic-write.js";
@@ -129,6 +130,14 @@ Options:
   --baseline-max-age <dur>
                       Phase 10D: baseline rotation policy (see "Baseline rotation"
                       below). Duration like 30d | 12h | 90m | 2w.
+  --perf-budgets <path>
+                      Phase 13: JSON file of performance budgets (ttfb, fcp, lcp,
+                      cls, domContentLoaded, loadEvent). A metric over budget becomes
+                      a CRITICAL finding, so --ci exits 1 under the default
+                      --fail-on failed policy. Missing/malformed budget files are a
+                      configuration error (exit 1 locally, 2 with --ci) — never a
+                      silent pass. Defaults to perf.budgets in ${QA_CONFIG_FILENAME};
+                      the CLI flag always overrides the configuration.
   --history-dir <path> Phase 7A: run history directory (default: ${DEFAULT_HISTORY_DIR})
   --reset-history     Phase 7A: delete ONLY the history directory, then resume this run
   --ci                Phase 8C: apply the CI exit policy. Exit codes:
@@ -158,6 +167,17 @@ Baseline rotation (Phase 10D):
   or the artifact's own generatedAt; legacy baselines with no usable timestamp
   are never failed (age "unknown" is not enforceable). The \`verify\` subcommand
   shows the age but takes no position — its 0/2 exit contract is unchanged.
+
+Performance budgets (Phase 13):
+  A budget file declares the page metrics the team agreed to ship, e.g.
+  { "lcp": 2500, "cls": 0.1, "ttfb": 800 }. Each configured metric is compared
+  against the scan's measured value; a breach becomes an ordinary FAIL issue
+  (perf-budget-<metric>), so it flows through the same severity rubric, the
+  same overall status, and the same Phase 8C policy as every other finding -
+  no new exit code and no separate gate. Budgets are evaluated once, in the QA
+  pipeline, so the same file also gates a reused --report artifact without
+  re-scanning. When an access prerequisite stopped the scan, budgets are not
+  evaluated: there is no measured page to judge.
 
 ${CI_CONTRACT_SUMMARY}
 
@@ -238,6 +258,8 @@ export type QaOptions = {
   failOn: CiFailPolicy | null;
   /** Phase 9: threshold for NEW findings that fail the baseline gate. */
   gateMinSeverity: GateMinSeverity;
+  /** Phase 13: performance budgets file (`--perf-budgets`), or null. */
+  perfBudgetsPath: string | null;
   /** Phase 8E: existing stages that can be turned off by configuration. */
   coverage: boolean;
   regression: boolean;
@@ -246,7 +268,7 @@ export type QaOptions = {
   historicalIntelligence: boolean;
 };
 
-const VALUE_OPTIONS = new Set(["--report", "--suite", "--output", "--timeout", "--concurrency", "--max-pages", "--max-depth", "--max-flows", "--max-flow-steps", "--baseline", "--write-baseline", "--baseline-max-age", "--history-dir"]);
+const VALUE_OPTIONS = new Set(["--report", "--suite", "--output", "--timeout", "--concurrency", "--max-pages", "--max-depth", "--max-flows", "--max-flow-steps", "--baseline", "--write-baseline", "--baseline-max-age", "--history-dir", "--perf-budgets"]);
 
 const optionValue = (args: string[], name: string, fallback: string): string => {
   const index = args.indexOf(name);
@@ -272,7 +294,7 @@ export function parseArgs(args: string[], config: QaConfig = {}): QaOptions | nu
     ["--report", true], ["--suite", true], ["--output", true], ["--baseline", true],
     ["--write-baseline", true], ["--baseline-max-age", true], ["--history-dir", true], ["--timeout", true], ["--concurrency", true],
     ["--max-pages", true], ["--max-depth", true], ["--max-flows", true], ["--max-flow-steps", true], ["--execute", false],
-    ["--fail-on", true],
+    ["--fail-on", true], ["--perf-budgets", true],
   ];
   const consumed = new Set<number>();
   for (const [name, always] of valueOptions) {
@@ -332,6 +354,12 @@ export function parseArgs(args: string[], config: QaConfig = {}): QaOptions | nu
   const baselineMaxAge = optionValue(args, "--baseline-max-age", "") || resolved.baselineMaxAge || null;
   const baselineMaxAgeMs = baselineMaxAge != null ? parseBaselineMaxAge(baselineMaxAge) : null;
 
+  // Phase 13 — performance budgets. Precedence is the same as every other
+  // config-backed value: CLI flag wins, then perf.budgets in qa.config.json.
+  // The file is loaded and validated in runQa before any pipeline work, so a
+  // missing or malformed file fails loudly and early instead of passing silently.
+  const perfBudgetsPath = optionValue(args, "--perf-budgets", "") || resolved.perfBudgetsPath || null;
+
   // Phase 11B — artifact-boundary guards. These are PURE usage validation:
   // they never write a file, and they make it impossible for a run to:
   //   1. parse a dash token as a value-option path (the old bare
@@ -340,7 +368,7 @@ export function parseArgs(args: string[], config: QaConfig = {}): QaOptions | nu
   //   3. write its report over the baseline it publishes (`--output` ==
   //      `--write-baseline`, or over the sidecar path),
   //   4. publish a baseline over the very artifact it compares against.
-  for (const name of ["--report", "--suite", "--output", "--baseline", "--write-baseline", "--baseline-max-age", "--history-dir"]) {
+  for (const name of ["--report", "--suite", "--output", "--baseline", "--write-baseline", "--baseline-max-age", "--history-dir", "--perf-budgets"]) {
     const index = args.indexOf(name);
     if (index >= 0 && (args[index + 1] === undefined || args[index + 1].startsWith("-"))) {
       throw new Error(`${name} requires a value (a file path or argument), got ${args[index + 1] === undefined ? "(missing)" : args[index + 1]}.`);
@@ -363,7 +391,7 @@ export function parseArgs(args: string[], config: QaConfig = {}): QaOptions | nu
   }
 
   return {
-    url, reportPath, suitePath, outputPath, execute, headed, timeout, concurrency, crawl, maxPages, maxDepth, maxFlows, maxFlowSteps, baselinePath, writeBaselinePath, baselineMaxAge, baselineMaxAgeMs, historyDir, resetHistory: resetHistoryFlag, ci, failOn,
+    url, reportPath, suitePath, outputPath, execute, headed, timeout, concurrency, crawl, maxPages, maxDepth, maxFlows, maxFlowSteps, baselinePath, writeBaselinePath, baselineMaxAge, baselineMaxAgeMs, historyDir, resetHistory: resetHistoryFlag, ci, failOn, perfBudgetsPath,
     gateMinSeverity: resolved.gateMinSeverity,
     coverage: resolved.coverage,
     regression: resolved.regression,
@@ -599,6 +627,11 @@ export async function main(): Promise<void> {
   const options = parseArgs(args, loaded.config);
   if (!options) { console.log(help); return; }
 
+  // Phase 13: resolve the performance budgets BEFORE any pipeline work. The
+  // file is validated here so a missing/malformed/unknown-key file is a loud
+  // configuration failure (exit 1 locally, 2 with --ci) — never a silent pass.
+  const perfBudgets = options.perfBudgetsPath ? loadQaPerfBudgets(options.perfBudgetsPath) : null;
+
   // Structured stage events travel on a sidecar file next to the report
   // artifacts, mirroring how the execution artifact is derived. Human stdout is
   // untouched.
@@ -661,6 +694,21 @@ export async function main(): Promise<void> {
     suite = generateTestSuite(report, { sourcePath: reportPathForSuite });
     completeStage("generate");
     console.log(`Generated suite: ${suite.counts.total} scenarios (${suite.counts.automated} automated, ${suite.counts.review} review, ${suite.counts.highRisk} high-risk, ${suite.counts.conditional} conditional).`);
+  }
+
+  // Phase 13: evaluate the budgets exactly once, on the report this run is
+  // about to analyze (a fresh scan or a reused --report artifact alike). This
+  // is deliberately after the access decision: when an access prerequisite
+  // stopped the scan there is no measured page to judge, so budgets are not
+  // evaluated and no finding is invented from an untested target.
+  if (perfBudgets) {
+    if (accessBlocked) {
+      console.log(`Performance budgets: not evaluated — normal QA scan did not run (${options.perfBudgetsPath}).`);
+    } else {
+      const breached = applyPerfBudgets(report, perfBudgets);
+      console.log(`Performance budgets: ${describePerfBudgets(perfBudgets)} (${options.perfBudgetsPath}) — ${breached.length} of ${Object.keys(perfBudgets).length} breached.`);
+      for (const issue of breached) console.log(`  BREACH ${issue.code}: ${issue.message}`);
+    }
   }
 
   const provider = createAIProvider();

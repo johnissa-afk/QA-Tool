@@ -452,6 +452,10 @@ test("scanner collects performance metrics with a perf-budgets file", async () =
     assert.ok(result.report.performance, "performance metrics should be present");
     const budgetIssues = result.report.issues.filter(i => i.code.startsWith("perf-budget-"));
     assert.ok(typeof result.report.performance !== "undefined", "performance field should exist in report");
+    // Phase 13 guard: Chromium keeps LCP out of the passive timeline, so a
+    // budgets file could only ever have "passed" against a null measurement.
+    assert.equal(typeof result.report.performance.lcp, "number", "LCP is actually measured, not silently null");
+    assert.ok(budgetIssues.some(issue => issue.code === "perf-budget-lcp" && issue.status === "FAIL"), "the LCP budget is enforced against the measured value");
   } finally {
     rmSync(folder, { recursive: true, force: true });
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));

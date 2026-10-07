@@ -2,10 +2,12 @@ import { atomicWriteText } from "../atomic-write.js";
 import { extname, resolve } from "node:path";
 import { QaAnalysis, QaFinding, Severity } from "./types.js";
 import { escapeHtml, safeHref } from "../html-escape.js";
+import { PERF_METRIC_LABELS, isPerfBudgetCode } from "../perf-budgets.js";
+import type { PerformanceMetrics } from "../types.js";
 import type { HistoricalIntelligenceMap } from "../history-intelligence/types.js";
 
 // ---------------------------------------------------------------------------
-// QA analysis HTML report (14 sections).
+// QA analysis HTML report (15 sections).
 // ---------------------------------------------------------------------------
 
 const REGRESSION_TONES: Record<string, string> = {
@@ -651,6 +653,32 @@ const coverageSection = (analysis: QaAnalysis): string => {
     ${tables}`;
 };
 
+// Phase 13 - performance: the measured metrics plus, when a budgets file was
+// configured, the breaches (which are ordinary findings and also appear in the
+// severity tables above). Pure presentation: nothing is measured, scored, or
+// invented here.
+const performanceSection = (analysis: QaAnalysis): string => {
+  const metrics: PerformanceMetrics | undefined = analysis.scan.performance;
+  const breached = analysis.findings.filter(finding => isPerfBudgetCode(finding.code));
+  if (!metrics && breached.length === 0) return "";
+  const keys = Object.keys(PERF_METRIC_LABELS) as (keyof PerformanceMetrics)[];
+  const rows = keys.map(key => {
+    const value = metrics?.[key] ?? null;
+    const rendered = value == null ? "unavailable" : key === "cls" ? value.toFixed(3) : `${Math.round(value)} ms`;
+    return `<tr><th>${escapeHtml(PERF_METRIC_LABELS[key])}</th><td>${escapeHtml(rendered)}</td></tr>`;
+  }).join("");
+  const breachTable = breached.length
+    ? `<h3>Declared budgets exceeded</h3>
+  <table><thead><tr><th>Finding</th><th>Metric</th><th>Measured vs budget</th></tr></thead><tbody>${breached.map(finding => `<tr><td><code>${escapeHtml(finding.id)}</code></td><td><span class="q">${escapeHtml(finding.title)}</span></td><td class="sub">${escapeHtml(finding.description)}</td></tr>`).join("")}</tbody></table>`
+    : `<p class="sub">No configured performance budget was exceeded.</p>`;
+  return `<section>
+  <h2>Performance</h2>
+  <p class="sub">Measured during the scan. Metrics are checked against the performance budgets file only when one was configured (<code>--perf-budgets</code> or <code>perf.budgets</code> in qa.config.json); a breach is an ordinary CRITICAL finding, never a separate gate or a new exit code.</p>
+  <table><tbody>${rows}</tbody></table>
+  ${breachTable}
+</section>`;
+};
+
 const accessPrerequisiteSection = (analysis: QaAnalysis): string => {
   const ap = analysis.accessPrerequisite;
   if (!ap) return "";
@@ -741,6 +769,8 @@ ${accessPrerequisiteSection(analysis)}
     <tr><th>Scan time</th><td>${escapeHtml(scan.scan.timestamp)} (${escapeHtml(scan.scan.durationMs)} ms)</td></tr>
   </tbody></table>
 </section>
+
+${performanceSection(analysis)}
 
 <section>
   <h2>QA Findings by Severity</h2>
