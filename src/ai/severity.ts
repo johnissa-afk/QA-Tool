@@ -279,6 +279,46 @@ export function classifyIssue(issue: Issue, ctx: SeverityContext): SeverityVerdi
         recommendation: "Review the visual difference and either fix the regression or update the baseline screenshot if the change is intentional.",
         userImpact: "The rendered page differs visually from the approved baseline.",
       };
+    case "missing-content-security-policy":
+      return {
+        severity: "MEDIUM",
+        confidence: "high",
+        rationale: `${issue.message} The response carried no policy the browser could enforce for scripts, frames, or resource loads.`,
+        recommendation: "Define a Content-Security-Policy and serve it from the navigation response, starting in Report-Only mode to measure violations before enforcing.",
+        userImpact: "A script-injection bug anywhere on the page runs without a browser-enforced policy to contain it.",
+      };
+    case "missing-hsts":
+      return {
+        severity: "MEDIUM",
+        confidence: "high",
+        rationale: `${issue.message} Without Strict-Transport-Security the browser has no instruction to keep this host on HTTPS.`,
+        recommendation: "Serve Strict-Transport-Security from the HTTPS origin, for example max-age=31536000; includeSubDomains.",
+        userImpact: "A network attacker can downgrade the first request to plain HTTP and read or modify it.",
+      };
+    case "missing-x-content-type-options":
+      return {
+        severity: "LOW",
+        confidence: "high",
+        rationale: `${issue.message} Without the nosniff directive a browser may MIME-sniff the response into a different, potentially executable type.`,
+        recommendation: "Send X-Content-Type-Options: nosniff with every response.",
+        userImpact: "A mis-typed response such as an uploaded file can be treated as executable script.",
+      };
+    case "missing-frame-options":
+      return {
+        severity: "LOW",
+        confidence: "high",
+        rationale: `${issue.message} Any site can embed this page in a frame, which is the setup clickjacking relies on.`,
+        recommendation: "Send X-Frame-Options (DENY or SAMEORIGIN), or add a frame-ancestors directive to the Content-Security-Policy.",
+        userImpact: "An attacker can overlay the framed page and trick users into clicking controls they cannot see.",
+      };
+    case "missing-referrer-policy":
+      return {
+        severity: "LOW",
+        confidence: "high",
+        rationale: `${issue.message} Cross-origin destinations receive whatever referrer the browser chooses by default.`,
+        recommendation: "Send Referrer-Policy with every response, for example strict-origin-when-cross-origin.",
+        userImpact: "Full URLs including path and query may leak to third-party destinations.",
+      };
   }
 
   // Hidden/disabled interactive elements and any future INFO codes default here.

@@ -9,6 +9,7 @@ import { detectAccess } from "./qa/access.js";
 import { AuthenticationDiagnostic, ConsoleDiagnostic, DiscoveredElement, Issue, LinkResult, PerformanceMetrics, ScanOptions, ScanReport, WaitUntil } from "./types.js";
 import { checkPerfBudgets, loadPerfBudgets } from "./perf-budgets.js";
 import { buildScreenshotDiffIssue, diffScreenshots, ScreenshotDiffResult } from "./screenshot-diff.js";
+import { checkSecurityHeaders } from "./security-headers.js";
 
 type RawElement = Omit<DiscoveredElement, "recommendedLocator" | "locatorQuality">;
 export type AuthenticationConfig = { httpCredentials?: { username: string; password: string }; authorization?: string; diagnostic: Omit<AuthenticationDiagnostic, "accepted"> };
@@ -256,6 +257,9 @@ export async function scanPageInContext(context: BrowserContext, options: ScanOp
     if (navigationStatus === 401) issues.push({ status: "FAIL", code: "authentication-failed", message: "Navigation returned HTTP 401. HTTP Basic Authentication was not accepted or is not configured." });
     else if (navigationStatus && navigationStatus >= 400) issues.push({ status: "FAIL", code: "page-http-error", message: `Page navigation returned HTTP ${navigationStatus}.` });
     else issues.push({ status: "PASS", code: "page-scanned", message: "Page loaded and element discovery completed." });
+    if (response && navigationStatus && navigationStatus < 400) {
+      issues.push(...checkSecurityHeaders(response.headers(), finalUrl));
+    }
     const allLinks = [...new Set(elements.map(element => element.href).filter((href): href is string => Boolean(href && href.startsWith("http"))))];
     const filteredLinks = allLinks.filter(link => {
       const linkOrigin = new URL(link).origin;

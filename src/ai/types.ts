@@ -150,7 +150,8 @@ export type FindingDomain =
   | "robustness"
   | "content"
   | "console"
-  | "performance";
+  | "performance"
+  | "security";
 
 // ---------------------------------------------------------------------------
 // Evidence. The AI layer never invents evidence: every claim must trace back

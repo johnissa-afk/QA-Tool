@@ -50,6 +50,11 @@ const DOMAIN_BY_CODE: Record<string, FindingDomain> = {
   "perf-budget-cls": "performance",
   "perf-budget-domContentLoaded": "performance",
   "perf-budget-loadEvent": "performance",
+  "missing-content-security-policy": "security",
+  "missing-hsts": "security",
+  "missing-x-content-type-options": "security",
+  "missing-frame-options": "security",
+  "missing-referrer-policy": "security",
 };
 
 export const domainFor = (code: string): FindingDomain => DOMAIN_BY_CODE[code] ?? "robustness";
@@ -87,6 +92,11 @@ const LABEL_BY_CODE: Record<string, string> = {
   "perf-budget-cls": "Performance budget exceeded: CLS",
   "perf-budget-domContentLoaded": "Performance budget exceeded: DOM Content Loaded",
   "perf-budget-loadEvent": "Performance budget exceeded: Load Event",
+  "missing-content-security-policy": "Missing Content-Security-Policy",
+  "missing-hsts": "Missing Strict-Transport-Security",
+  "missing-x-content-type-options": "Missing X-Content-Type-Options",
+  "missing-frame-options": "Missing clickjacking protection",
+  "missing-referrer-policy": "Missing Referrer-Policy",
 };
 
 export const labelFor = (code: string): string => LABEL_BY_CODE[code] ?? code;
