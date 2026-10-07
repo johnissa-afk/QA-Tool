@@ -19,7 +19,7 @@ export type ScreenshotDiffResult = {
 export async function diffScreenshots(page: Page, current: Buffer, baseline: Buffer): Promise<ScreenshotDiffResult> {
   const currentDataUrl = `data:image/png;base64,${current.toString("base64")}`;
   const baselineDataUrl = `data:image/png;base64,${baseline.toString("base64")}`;
-  return page.evaluate(({ current, baseline }: { current: string; baseline: string }): Promise<ScreenshotDiffResult> => {
+  const compare = ({ current, baseline }: { current: string; baseline: string }): Promise<ScreenshotDiffResult> => {
     const loadImage = (dataUrl: string): Promise<HTMLImageElement> => {
       return new Promise((resolve, reject) => {
         const img = new Image();
@@ -58,7 +58,18 @@ export async function diffScreenshots(page: Page, current: Buffer, baseline: Buf
       return { diffPixels, totalPixels, diffPercentage: (diffPixels / totalPixels) * 100 };
     };
     return run();
-  }, { current: currentDataUrl, baseline: baselineDataUrl });
+  };
+  // tsx/esbuild (keepNames) rewrites inner named functions into calls of a
+  // module-scope __name helper that does not exist inside the browser page.
+  // Detect that rewriting from the serialized source and, only then, install
+  // a no-op __name in the page so the diff body can execute. The compiled
+  // tsc build never matches, so normal scans leave the page untouched.
+  if (/\b__name\b/.test(compare.toString())) {
+    await page.evaluate(() => {
+      ((globalThis as any).__name) ??= (fn: any) => fn;
+    });
+  }
+  return page.evaluate(compare, { current: currentDataUrl, baseline: baselineDataUrl });
 }
 
 /** Builds a FAIL issue when the diff percentage exceeds the threshold. */

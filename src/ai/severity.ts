@@ -263,6 +263,22 @@ export function classifyIssue(issue: Issue, ctx: SeverityContext): SeverityVerdi
         recommendation: "Re-run the scan in headed mode or check the output directory permissions.",
         userImpact: "No visual verification artifact for humans.",
       };
+    case "screenshot-diff-error":
+      return {
+        severity: "INFO",
+        confidence: "high",
+        rationale: issue.message,
+        recommendation: "Verify the baseline screenshot is readable and has the same dimensions.",
+        userImpact: "Visual regression comparison could not be performed.",
+      };
+    case "visual-regression":
+      return {
+        severity: "HIGH",
+        confidence: "high",
+        rationale: issue.message,
+        recommendation: "Review the visual difference and either fix the regression or update the baseline screenshot if the change is intentional.",
+        userImpact: "The rendered page differs visually from the approved baseline.",
+      };
   }
 
   // Hidden/disabled interactive elements and any future INFO codes default here.
