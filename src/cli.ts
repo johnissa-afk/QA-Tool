@@ -70,12 +70,28 @@ const parsePerfBudgetsPath = (rest: string[]): string | undefined => {
   return raw;
 };
 
+const parseBaselineScreenshotPath = (rest: string[]): string | undefined => {
+  if (!rest.includes("--baseline-screenshot")) return undefined;
+  const raw = rest[rest.indexOf("--baseline-screenshot") + 1];
+  if (!raw || raw.startsWith("-")) throw new Error("--baseline-screenshot requires a value.");
+  return raw;
+};
+
+const parseScreenshotThreshold = (rest: string[]): number | undefined => {
+  if (!rest.includes("--screenshot-threshold")) return undefined;
+  const raw = rest[rest.indexOf("--screenshot-threshold") + 1];
+  if (!raw || raw.startsWith("-")) throw new Error("--screenshot-threshold requires a value.");
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < 0) throw new Error("--screenshot-threshold must be a non-negative number.");
+  return value;
+};
+
 export function parseArgs(args: string[]): ScanOptions | null {
   if (args.includes("--help") || args.includes("-h")) return null;
   const [url, ...rest] = args;
   if (!url || url.startsWith("-")) throw new Error(help);
   new URL(url);
-  for (const name of ["--output", "--timeout", "--concurrency", "--perf-budgets", "--baseline-screenshot"]) {
+  for (const name of ["--output", "--timeout", "--concurrency", "--perf-budgets", "--baseline-screenshot", "--screenshot-threshold"]) {
     const index = rest.indexOf(name);
     if (index >= 0 && (rest[index + 1] === undefined || rest[index + 1].startsWith("-"))) {
       throw new Error(`${name} requires a value.`);
@@ -83,7 +99,7 @@ export function parseArgs(args: string[]): ScanOptions | null {
   }
   const option = (name: string, fallback: string) => rest.includes(name) ? (rest[rest.indexOf(name) + 1] ?? "") : fallback;
   const positive = (name: string, fallback: number) => { const value = Number(option(name, String(fallback))); if (!Number.isFinite(value) || value < 1) throw new Error(`${name} must be a positive number.`); return value; };
-  return { url: new URL(url).href, headed: rest.includes("--headed"), timeout: positive("--timeout", 30_000), outputPath: resolve(option("--output", "reports/qa-report.json")), concurrency: Math.floor(positive("--concurrency", 5)), retries: parseRetry(rest), waitUntil: parseWaitUntil(rest), throttleKbps: parseThrottle(rest), includePatterns: parseInclude(rest), excludePatterns: parseExclude(rest), followExternal: rest.includes("--follow-external"), reporter: parseReporter(rest), githubAnnotations: rest.includes("--github-annotations"), perfBudgetsPath: parsePerfBudgetsPath(rest) };
+  return { url: new URL(url).href, headed: rest.includes("--headed"), timeout: positive("--timeout", 30_000), outputPath: resolve(option("--output", "reports/qa-report.json")), concurrency: Math.floor(positive("--concurrency", 5)), retries: parseRetry(rest), waitUntil: parseWaitUntil(rest), throttleKbps: parseThrottle(rest), includePatterns: parseInclude(rest), excludePatterns: parseExclude(rest), followExternal: rest.includes("--follow-external"), reporter: parseReporter(rest), githubAnnotations: rest.includes("--github-annotations"), perfBudgetsPath: parsePerfBudgetsPath(rest), baselineScreenshotPath: parseBaselineScreenshotPath(rest), screenshotThreshold: parseScreenshotThreshold(rest) };
 }
 
 async function main(): Promise<void> {
