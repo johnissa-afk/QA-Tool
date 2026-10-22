@@ -34,6 +34,27 @@ const LOGIN_EVIDENCE = /<form\b[\s\S]*?(?:password|sign[ -]?in|log[ -]?in)|\b(?:
 const BOT_EVIDENCE = /cloudflare|cf-chl-|challenge-platform|verify you are human|attention required|request blocked|you have been blocked|bot detection|security challenge/i;
 const ACCESS_BLOCK_EVIDENCE = /access denied|forbidden|request blocked|you have been blocked/i;
 
+// A page that loaded successfully (2xx/3xx) is only a challenge when it LOOKS like one.
+// Mentioning "cloudflare", loading /cdn-cgi/challenge-platform/scripts/jsd/main.js (injected
+// into ordinary Cloudflare-fronted pages) or containing the word "forbidden" proves nothing.
+const CHALLENGE_TITLE = /^\s*(?:just a moment|attention required|checking your browser|verify(?:ing)? you are human|security check|access denied|request blocked|you have been blocked|403 forbidden)/i;
+const BOT_TITLE = /^\s*(?:just a moment|attention required|checking your browser|verify(?:ing)? you are human|security check)/i;
+const STRONG_CHALLENGE_MARKERS = /cf-chl-|cf_chl_opt|id=["']challenge-form["']|class=["'][^"']*cf-turnstile|\/cdn-cgi\/challenge-platform\/h\/[a-z]\/orchestrate\/|chl_page/i;
+const THIN_PAGE_TEXT_LENGTH = 400;
+
+function titleOf(body: string): string | null {
+  const match = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(body);
+  return match ? match[1]!.replace(/\s+/g, " ").trim() : null;
+}
+
+function visibleText(body: string): string {
+  return body
+    .replace(/<(script|style|noscript)\b[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function authenticationTypeOf(challenge: string | null): AuthenticationType {
   if (!challenge) return "none";
   const value = challenge.toLowerCase();
@@ -68,16 +89,39 @@ export function detectAccess(input: AccessDetectionInput): AccessDetection {
     });
   }
 
-  if (input.httpStatus === 403 || input.httpStatus === 429 || ACCESS_BLOCK_EVIDENCE.test(body) || BOT_EVIDENCE.test(body)) {
-    const bot = BOT_EVIDENCE.test(body) && (input.httpStatus === 403 || input.httpStatus === 429 || /challenge|blocked|cloudflare/i.test(body));
+  const status = input.httpStatus;
+  const succeeded = status != null && status >= 200 && status < 400;
+  const title = titleOf(body);
+  const strongMarker = STRONG_CHALLENGE_MARKERS.test(body);
+  const challengeTitle = title !== null && CHALLENGE_TITLE.test(title);
+  const statusBlocked = status === 403 || status === 429;
+  const text = visibleText(body);
+  const thinPage = text.length < THIN_PAGE_TEXT_LENGTH;
+  // A near-empty page whose only visible words are a block/challenge message (e.g. a bare
+  // "Access Denied" with HTTP 200). Big real pages that merely contain such a word do not match.
+  const thinBlockText = thinPage && (ACCESS_BLOCK_EVIDENCE.test(text) || BOT_EVIDENCE.test(text));
+  // Non-success responses (e.g. a 503 "under attack" page, or no response at all) keep the
+  // broad text evidence; successful pages need a specific challenge signal.
+  const textBlocked = !succeeded && (ACCESS_BLOCK_EVIDENCE.test(body) || BOT_EVIDENCE.test(body));
+  const successChallenge = succeeded && (challengeTitle || (strongMarker && thinPage) || thinBlockText);
+
+  if (statusBlocked || textBlocked || successChallenge) {
+    const bot = succeeded
+      ? strongMarker || (title !== null && BOT_TITLE.test(title)) || (thinBlockText && BOT_EVIDENCE.test(text))
+      : BOT_EVIDENCE.test(body) && (statusBlocked || /challenge|blocked|cloudflare/i.test(body));
+    const signal = statusBlocked
+      ? `HTTP ${status}`
+      : succeeded
+        ? challengeTitle ? `page title "${title}"` : "challenge markers or block wording on an almost empty page"
+        : "block/challenge text in a non-success response";
     return result(input, {
       accessStatus: bot ? "bot-protection" : "access-blocked",
       authenticationType,
       challenge,
       redirectDestination: redirected,
-      reason: bot
+      reason: (bot
         ? "The target appears to require a bot or security challenge before automated scanning can proceed."
-        : `The target returned HTTP ${input.httpStatus ?? "an access-control response"} and automated scanning cannot proceed.`,
+        : `The target returned HTTP ${input.httpStatus ?? "an access-control response"} and automated scanning cannot proceed.`) + ` Detected via: ${signal}.`,
       continueScan: false,
       humanReview: true,
     });

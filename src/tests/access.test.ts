@@ -447,3 +447,37 @@ test("scheduled and executed → reproduction is allowed and reflected", async (
   const finalStatus = recomputeOverallStatus(applied);
   assert.equal(finalStatus, "REVIEW", "HIGH finding reproduced → REVIEW (not FAIL/PASS)");
 });
+
+test("HTML report shows SITE NOT TESTED instead of a wall of zero metrics for a blocked site", async () => {
+  const access = detectAccess(input({ httpStatus: 401, headers: { "www-authenticate": "Basic realm=\"x\"" } }));
+  const analysis = await analyzeScan(baseScanReport(access), {});
+  const html = renderQaHtml(analysis);
+  assert.ok(html.includes("SITE NOT TESTED"), "blocked report carries an explicit NOT TESTED notice");
+  assert.ok(html.includes("authentication-required"), "the reason is shown in the summary");
+  assert.ok(!html.includes("<div class=\"card\"><strong>0</strong>Findings</div>"), "no zero Findings card for a site that was never scanned");
+  assert.ok(html.includes("Not assessed"), "the severity table is replaced by a not-assessed note");
+
+  const okHtml = renderQaHtml(await analyzeScan(accessibleReport(), {}));
+  assert.ok(!okHtml.includes("SITE NOT TESTED"), "accessible sites never show the notice");
+});
+
+
+test("a successful page is not a bot wall just because it mentions Cloudflare, loads its beacon script, or contains the word forbidden", () => {
+  const real = "<html><head><title>Home</title></head><body>" + "<p>real content</p>".repeat(60) + "</body></html>";
+  const spaShell = "<html><head><title></title></head><body><div id=\"root\"></div><script src=\"/cdn-cgi/challenge-platform/scripts/jsd/main.js\"></script></body></html>";
+  for (const body of [spaShell, real + "<p>Protected by Cloudflare</p>", real + "<p>Smoking is forbidden here</p>"]) {
+    const detected = detectAccess(input({ httpStatus: 200, body }));
+    assert.equal(detected.accessStatus, "accessible");
+    assert.equal(detected.continueScan, true);
+  }
+});
+
+test("genuine challenge pages are still detected, and the reason names the signal", () => {
+  const titled = detectAccess(input({ httpStatus: 200, body: "<html><head><title>Just a moment...</title></head><body><div id=\"challenge-form\"></div></body></html>" }));
+  assert.equal(titled.accessStatus, "bot-protection");
+  assert.equal(titled.continueScan, false);
+  assert.match(titled.reason, /Detected via: page title "Just a moment\.\.\."/);
+  const status = detectAccess(input({ httpStatus: 403, body: "<title>Cloudflare challenge</title>" }));
+  assert.match(status.reason, /Detected via: HTTP 403/);
+  assert.equal(detectAccess(input({ httpStatus: 503, body: "<title>Attention Required! | Cloudflare</title>" })).accessStatus, "bot-protection");
+});
