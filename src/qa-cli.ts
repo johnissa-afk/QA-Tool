@@ -20,6 +20,8 @@ import { buildVerificationTasks, renderVerificationSpec, runPlaywright, runVerif
 import { refreshVerificationRedactor } from "./executor/verify.js";
 import { TaskSkip } from "./executor/tasks.js";
 import { attachFlowExecutions, crawlSite, loadFlowResults, renderFlowSpec } from "./flow/index.js";
+import { resetResultsDir } from "./executor/run-dir.js";
+import { FLOWS_DIR } from "./flow/spec.js";
 import { refreshFlowRedactor } from "./flow/execute.js";
 import { FlowLimits, SiteGraph } from "./flow/types.js";
 import {
@@ -40,7 +42,7 @@ import { buildQaResultBlock, qaResultInputOf } from "./qa/result.js";
 import { CI_DEFAULT_FAIL_POLICY, CI_EXIT_INFRASTRUCTURE, CI_EXIT_POLICY_FAILURE, CI_EXIT_SUCCESS, CI_FAIL_POLICIES, CiFailPolicy, decideCiExit, formatCiExit, parseCiFailPolicy } from "./qa/ci-policy.js";
 import { evaluateGate, formatGateVerdict, GateMinSeverity } from "./qa/gate.js";
 import { CANONICAL_CI_COMMAND, CI_CONTRACT_SUMMARY } from "./qa/ci-contract.js";
-import { classifyRunOutcome, classifyThrownError, formatFailureModeLine } from "./qa/failure-mode.js";
+import { accessPolicyFails, classifyRunOutcome, classifyThrownError, formatFailureModeLine } from "./qa/failure-mode.js";
 import { BASELINE_VERIFY_EXIT_FAILURE, BASELINE_VERIFY_EXIT_OK, baselineMaxAgeLabel, baselineMetaPathOf, baselineStalenessOf, formatBaselineAge, formatBaselineVerification, loadBaseline, parseBaselineMaxAge, verifyBaseline } from "./qa/baseline.js";
 import { QA_CONFIG_FILENAME, QaConfig, loadQaConfig, resolveQaConfig } from "./qa/config.js";
 import { applyPerfBudgets, describePerfBudgets, loadQaPerfBudgets } from "./qa/perf.js";
@@ -823,7 +825,9 @@ export async function main(): Promise<void> {
       const flowDiscovery = analysis.flowDiscovery;
       if (flowDiscovery && flowDiscovery.flows.some(flow => flow.executable)) {
         renderFlowSpec(report, flowDiscovery.flows, flowDiscovery.limits, DEFAULT_FLOW_SPEC);
-        runPlaywright(DEFAULT_FLOW_SPEC);
+        resetResultsDir(FLOWS_DIR);
+        const flowExecution = runPlaywright(DEFAULT_FLOW_SPEC);
+        if ((flowExecution.tests ?? 0) === 0) console.log(`Flow execution: Playwright ran 0 tests (${flowExecution.status}); flow outcomes will be reported as missing, not reused.`);
         const flowResults = loadFlowResults(flowDiscovery.flows);
         const refinedDiscovery = attachFlowExecutions(flowDiscovery, flowResults);
         analysis = { ...analysis, flowDiscovery: refinedDiscovery, summary: { ...analysis.summary, flowSummary: refinedDiscovery.summary } };
@@ -1123,10 +1127,27 @@ export async function main(): Promise<void> {
     // throws and the top-level handler returns exit 2 in CI mode).
     // Phase 11C: the one failure-mode classifier owns the verdict — the exit
     // code and the machine-readable `Failure mode:` line always agree.
-    const outcome = classifyRunOutcome({ decision, gate, rotationFailed });
+    // Access: when normal QA never ran (REVIEW_REQUIRED / BLOCKED) the site was
+    // not tested, so that is a completed QA policy failure — exit 1, never
+    // "acceptable → exit 0". A local run still just prints REVIEW and keeps its
+    // normal exit code; only --ci applies this.
+    const accessStatus = analysis.accessPrerequisite?.status ?? null;
+    const outcome = classifyRunOutcome({
+      decision,
+      gate,
+      rotationFailed,
+      accessPrerequisiteStatus: accessStatus,
+    });
     const exitCode = outcome.exitCode;
     console.log("");
     console.log(formatCiExit(decision));
+    // The line above is only the Phase 8C status-vs-policy comparison, which
+    // legitimately reads "exit 0 (acceptable)" for a REVIEW-required run under
+    // --fail-on failed. State the access outcome on its own so a CI log can
+    // never be misread as "the website passed" when it was never tested.
+    if (accessPolicyFails(accessStatus)) {
+      console.log(`CI: access prerequisite ${accessStatus} → normal QA did not run → exit ${CI_EXIT_POLICY_FAILURE} (the website was not tested).`);
+    }
     console.log("");
     console.log(formatGateVerdict(gate));
     if (rotationMessage) {

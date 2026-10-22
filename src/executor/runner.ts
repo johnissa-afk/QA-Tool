@@ -3,6 +3,8 @@ import { join, resolve } from "node:path";
 import { QaExecution, VerificationResult } from "../ai/types.js";
 import { loadVerificationResults } from "./parse.js";
 import { VerificationTask } from "./tasks.js";
+import { resetResultsDir } from "./run-dir.js";
+import { VERIFICATION_DIR } from "./spec.js";
 
 // ---------------------------------------------------------------------------
 // Playwright runner.
@@ -71,7 +73,11 @@ function runPlaywright(specPath: string): QaExecution {
   const cli = join(process.cwd(), "node_modules", "@playwright", "test", "cli.js");
   // The positional arg is matched as a regex against test file paths, so the
   // spec filter must use forward slashes and escape regex metacharacters.
-  const specFilter = resolve(specPath).replace(/\\/g, "/").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // A path relative to the project root is used (not the absolute path): an
+  // absolute Windows path such as C:/Users/... may not match the path form
+  // Playwright tests against, which silently yields "0 tests".
+  const relative = resolve(specPath).replace(/\\/g, "/").replace(resolve(process.cwd()).replace(/\\/g, "/") + "/", "");
+  const specFilter = relative.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const startedAt = new Date().toISOString();
   const started = Date.now();
   const spawned = spawnSync(process.execPath, [cli, "test", specFilter, "--reporter=json"], {
@@ -86,7 +92,10 @@ function runPlaywright(specPath: string): QaExecution {
   try {
     if (start >= 0 && end > start) {
       const parsed = JSON.parse(stdout.slice(start, end + 1));
-      return { ...summarizePlaywrightJson(parsed), command: `node ${cli} test ${specFilter} --reporter=json`, startedAt, durationMs };
+      const summary = summarizePlaywrightJson(parsed);
+      const stderrText = (spawned.stderr ?? "").toString().trim();
+      if (summary.tests === 0 && stderrText) summary.failures = [{ title: "runner", message: stderrText.slice(0, 1000) }];
+      return { ...summary, command: `node ${cli} test ${specFilter} --reporter=json`, startedAt, durationMs };
     }
     throw new Error("No JSON report in Playwright output.");
   } catch (error) {
@@ -114,7 +123,21 @@ function runPlaywright(specPath: string): QaExecution {
 export type VerificationRun = { execution: QaExecution; results: VerificationResult[] };
 
 export function runVerificationSpec(specPath: string, tasks: VerificationTask[]): VerificationRun {
-  const execution = runPlaywright(specPath);
+  // Never let a previous run's outcome files (possibly from another site) be
+  // mistaken for this run's: scenario IDs repeat across sites.
+  resetResultsDir(VERIFICATION_DIR);
+  let execution = runPlaywright(specPath);
+  if (tasks.length > 0 && (execution.tests ?? 0) === 0 && execution.status !== "error") {
+    // Tasks were scheduled but Playwright discovered/ran nothing. That is an
+    // execution failure, not a clean "skipped" run.
+    execution = {
+      ...execution,
+      status: "error",
+      failures: [
+        { title: "runner", message: `${tasks.length} verification task(s) were scheduled but Playwright ran 0 tests; no outcomes were produced.${execution.failures[0] ? `\n${execution.failures[0].message}` : ""}`.slice(0, 2000) },
+      ],
+    };
+  }
   const results = loadVerificationResults(tasks);
   const reproduced = results.filter(result => result.status === "REPRODUCED").length;
   const notReproduced = results.filter(result => result.status === "NOT_REPRODUCED").length;

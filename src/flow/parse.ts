@@ -25,11 +25,14 @@ export function loadFlowResults(flows: DiscoveredFlow[], dir = FLOWS_DIR): FlowE
   for (const file of files) {
     if (!file.endsWith(".json")) continue;
     const scenarioId = file.slice(0, -".json".length);
+    // Only accept outcomes for flows discovered in THIS run; flow IDs repeat
+    // across sites, so unrelated files must never be attached.
+    if (!executable.has(scenarioId)) continue;
     try {
       const result = JSON.parse(readFileSync(join(resultsDir, file), "utf8")) as FlowExecutionResult;
       if (result && result.scenarioId) results.push(result);
     } catch {
-      if (executable.has(scenarioId)) results.push(missingOutcome(scenarioId));
+      results.push(missingOutcome(scenarioId));
     }
   }
   for (const flow of flows) {
