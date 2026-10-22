@@ -22,6 +22,7 @@ import { TaskSkip } from "./executor/tasks.js";
 import { attachFlowExecutions, crawlSite, loadFlowResults, renderFlowSpec } from "./flow/index.js";
 import { resetResultsDir } from "./executor/run-dir.js";
 import { FLOWS_DIR } from "./flow/spec.js";
+import { acquireRunLockForProcess } from "./qa/run-lock.js";
 import { refreshFlowRedactor } from "./flow/execute.js";
 import { FlowLimits, SiteGraph } from "./flow/types.js";
 import {
@@ -633,6 +634,11 @@ export async function main(): Promise<void> {
   // file is validated here so a missing/malformed/unknown-key file is a loud
   // configuration failure (exit 1 locally, 2 with --ci) — never a silent pass.
   const perfBudgets = options.perfBudgetsPath ? loadQaPerfBudgets(options.perfBudgetsPath) : null;
+
+  // Runs share generated/*.spec.ts and reports/verification|flows scratch files, so only one
+  // may be active at a time. A second run fails here with a clear message instead of silently
+  // overwriting the first run's outcomes (released automatically on every exit path).
+  if (options.url || options.execute) acquireRunLockForProcess(options.url ?? options.reportPath ?? "report");
 
   // Structured stage events travel on a sidecar file next to the report
   // artifacts, mirroring how the execution artifact is derived. Human stdout is
