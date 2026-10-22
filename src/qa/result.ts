@@ -27,6 +27,12 @@ export type QaResultInput = {
   jsonPath: string;
   htmlPath: string;
   historyPath: string;
+  /**
+   * Set when the target could not be scanned (login wall, bot protection,
+   * HTTP 401/403/429...). In that case "0 findings" means "nothing was tested",
+   * never "nothing is wrong", and the RESULT block must say so.
+   */
+  accessPrerequisite?: { type: string; status: string; message: string } | null;
 };
 
 export type QaResultContext = {
@@ -80,6 +86,9 @@ export function qaResultInputOf(analysis: QaAnalysis, context: QaResultContext):
     jsonPath: context.jsonPath,
     htmlPath: context.htmlPath,
     historyPath: context.historyPath,
+    accessPrerequisite: analysis.accessPrerequisite
+      ? { type: analysis.accessPrerequisite.type, status: analysis.accessPrerequisite.status, message: analysis.accessPrerequisite.message }
+      : null,
   };
 }
 
@@ -95,14 +104,25 @@ export function buildQaResultBlock(input: QaResultInput): string {
   push(`Status: ${input.status}`);
   if (input.runId) push(`Run:    ${input.runId}`);
   push("");
-  push(`Pages: ${input.pagesDiscovered} · Findings: ${input.findingsCount} (${input.occurrenceCount} occurrence(s)) · Verified: ${input.verified} · Reproduced: ${input.reproduced}`);
+  const blocked = input.accessPrerequisite ?? null;
+  if (blocked) {
+    // A blocked scan must never read like a clean one.
+    push("⚠ SITE NOT TESTED — this is NOT a clean result.");
+    push(`  Reason: ${blocked.type} (${blocked.status}) — ${blocked.message}`);
+    push("  No findings were assessed, so \"0 findings\" says nothing about the site's quality.");
+    push("  Next step: provide an approved session or credentials, then re-run.");
+    push("");
+    push("Pages: not scanned · Findings: not assessed · Verified: n/a · Reproduced: n/a");
+  } else {
+    push(`Pages: ${input.pagesDiscovered} · Findings: ${input.findingsCount} (${input.occurrenceCount} occurrence(s)) · Verified: ${input.verified} · Reproduced: ${input.reproduced}`);
+  }
   push("");
   const regressionText = input.regression
     ? input.regression.comparable
       ? `${input.regression.changeCount} change(s)`
       : "not comparable"
     : "not run (add --baseline)";
-  push(`Coverage: ${input.coverageLabel} · Regression: ${regressionText} · Historical: ${input.historicalStatus ?? "n/a"}${input.runsStored ? ` (${input.runsStored} run(s))` : ""}`);
+  push(`Coverage: ${blocked ? "NOT_TESTED" : input.coverageLabel} · Regression: ${regressionText} · Historical: ${input.historicalStatus ?? "n/a"}${input.runsStored ? ` (${input.runsStored} run(s))` : ""}`);
   push("");
   const queue = queuePriorityCounts(input.queue);
   push(`Investigation queue — P1: ${queue.P1} · P2: ${queue.P2} · P3: ${queue.P3}`);

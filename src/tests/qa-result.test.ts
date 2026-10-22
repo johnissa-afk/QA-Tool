@@ -144,3 +144,30 @@ test("qaResultInputOf falls back when regression and history are missing", () =>
   assert.equal(input.coverageLabel, "N/A");
   assert.deepEqual(queuePriorityCounts(input.queue), { P1: 0, P2: 0, P3: 0 });
 });
+
+test("a blocked scan is rendered as NOT TESTED, never as a clean zero-finding result", () => {
+  const block = buildQaResultBlock({
+    url: "https://staging.example.test/",
+    status: "REVIEW",
+    runId: "run-1",
+    pagesDiscovered: 1,
+    coverageLabel: "N/A",
+    findingsCount: 0,
+    occurrenceCount: 0,
+    verified: 0,
+    reproduced: 0,
+    regression: null,
+    historicalStatus: null,
+    queue: [],
+    runsStored: 1,
+    jsonPath: "reports/x.json",
+    htmlPath: "reports/x.html",
+    historyPath: "reports/history",
+    accessPrerequisite: { type: "login-required", status: "REVIEW_REQUIRED", message: "The target redirected to a login page." },
+  });
+  assert.match(block, /SITE NOT TESTED/);
+  assert.match(block, /login-required/);
+  assert.match(block, /Findings: not assessed/);
+  assert.match(block, /Coverage: NOT_TESTED/);
+  assert.doesNotMatch(block, /Findings: 0 /);
+});
