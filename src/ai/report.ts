@@ -635,6 +635,14 @@ const coverageSection = (analysis: QaAnalysis): string => {
     ["Test-plan actions", summary.recommendations],
   ].map(([label, value]) => `<div class="card"><strong>${escapeHtml(value)}</strong>${escapeHtml(label)}</div>`).join("");
 
+  // A scan that never reached the site must not render a wall of zeros: "0 findings"
+  // would read as "nothing is wrong". Show an explicit NOT TESTED notice instead.
+  const blocked = analysis.accessPrerequisite ?? null;
+  const blockedNotice = blocked
+    ? `<div class="notice" role="alert"><strong>SITE NOT TESTED — this is NOT a clean result.</strong><br>Reason: <code>${escapeHtml(blocked.type)}</code> (${escapeHtml(blocked.status)}) — ${escapeHtml(blocked.message)}<br>No page content was scanned, so no findings, counts or coverage figures were assessed. Provide an approved session or credentials, then re-run. Details are in the <em>Access Prerequisite</em> section below.</div>`
+    : "";
+  const summaryBody = blocked ? blockedNotice : `<div class="grid">${cards}</div>`;
+
   const planRows = testPlan.map(rec => `<div class="card fix">
     <div class="finding-head"><code>${escapeHtml(rec.recommendationId)}</code> <span class="badge badge-prio">${escapeHtml(rec.priority)}</span> <strong>${escapeHtml(rec.title)}</strong></div>
     <div class="chips">${escapeHtml(rec.priorityReason)}</div>
@@ -730,11 +738,19 @@ export function renderQaHtml(analysis: QaAnalysis): string {
     ["Investigation queue", analysis.intelligence?.summary.investigationQueue ?? 0],
   ].map(([label, value]) => `<div class="card"><strong>${escapeHtml(value)}</strong>${escapeHtml(label)}</div>`).join("");
 
+  // A scan that never reached the site must not render a wall of zeros: "0 findings"
+  // would read as "nothing is wrong". Show an explicit NOT TESTED notice instead.
+  const blocked = analysis.accessPrerequisite ?? null;
+  const blockedNotice = blocked
+    ? `<div class="notice" role="alert"><strong>SITE NOT TESTED — this is NOT a clean result.</strong><br>Reason: <code>${escapeHtml(blocked.type)}</code> (${escapeHtml(blocked.status)}) — ${escapeHtml(blocked.message)}<br>No page content was scanned, so no findings, counts or coverage figures were assessed. Provide an approved session or credentials, then re-run. Details are in the <em>Access Prerequisite</em> section below.</div>`
+    : "";
+  const summaryBody = blocked ? blockedNotice : `<div class="grid">${cards}</div>`;
+
   const countTable = SEVERITY_ORDER.map(({ severity, label }) => `<tr><td>${severityBadge(severity)}</td><td>${label}</td><td class="num">${escapeHtml(summary.bySeverity[severity])}</td></tr>`).join("");
 
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>QA Analysis — ${escapeHtml(scan.scan.title || scan.scan.url)}</title>
 <style>
-:root{color-scheme:light}body{font:14px system-ui,sans-serif;margin:0;background:#f7f9fc;color:#17212b;line-height:1.45}main{max-width:1440px;margin:auto;padding:2rem}h1{margin:0}h2{margin:2.2rem 0 .7rem}section,.overview{background:#fff;border:1px solid #d7dee8;border-radius:10px;padding:1.2rem;margin-top:1rem}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.75rem}.card{background:#fff;border:1px solid #d7dee8;border-radius:8px;padding:.85rem;margin-top:.6rem}.card strong{font-size:1.2rem;display:block}.headline{font-size:1.05rem;font-weight:600}.sub{color:#64748b;font-size:.85rem;margin-top:.15rem}.chips{color:#475569;font-size:.82rem;margin-top:.35rem}.chips.warn{background:#fef3c7;border-radius:6px;padding:.35rem .5rem}.fail{color:#b42318}.warning{color:#9a6700}.info{color:#175cd3}.pass{color:#067647}.num{text-align:right;font-variant-numeric:tabular-nums}.empty{color:#94a3b8;font-style:italic;padding:.4rem 0}.q{font-weight:600}.ev{margin:.2rem 0;padding-left:1.1rem;font-size:.82rem}.flow-el{font-size:.82rem;color:#475569}.badge{font-weight:700;font-size:.72rem;padding:.12rem .45rem;border-radius:99px;white-space:nowrap;display:inline-block;margin:.05rem}.badge-critical,.badge-fail,.badge-status-fail{background:#fde8e8;color:#b42318}.badge-high,.badge-status-review{background:#fef3c7;color:#9a6700}.badge-medium{background:#fff4e5;color:#b54708}.badge-low,.badge-info{background:#eef2f7;color:#475569}.badge-status-pass{background:#e6f4ea;color:#067647}.badge-status-not-tested{background:#eef2f7;color:#475569}.badge-status-blocked{background:#fde8e8;color:#b42318}.badge-conf-high{background:#e6f4ea;color:#067647}.badge-conf-medium{background:#fef3c7;color:#9a6700}.badge-conf-low{background:#fde8e8;color:#b42318}.badge-auto{background:#e0edff;color:#175cd3}.badge-manual{background:#f1f5f9;color:#475569}.badge-safe{background:#e6f4ea;color:#067647}.badge-review{background:#fef3c7;color:#9a6700}.badge-high-risk{background:#fde8e8;color:#b42318}.badge-blocked{background:#f8fafc;color:#0f172a;border:1px solid #94a3b8}.badge-flow{background:#ede9fe;color:#6d28d9}.badge-state{background:#e2e8f0;color:#334155}.badge-intent{background:#e0edff;color:#175cd3}.badge-prio{background:#f1f5f9;color:#475569}.badge-risk.safe{background:#e6f4ea;color:#067647}.badge-risk.review{background:#fef3c7;color:#9a6700}.badge-risk.high-risk{background:#fde8e8;color:#b42318}.finding-head{display:flex;flex-wrap:wrap;gap:.3rem;align-items:center}table{border-collapse:collapse;width:100%;background:#fff}td,th{padding:.6rem;border:1px solid #d7dee8;text-align:left;vertical-align:top;word-break:break-word}th{background:#f1f5f9}code{white-space:pre-wrap;font-size:.85em}.finding{font-size:.85rem}.finding .q{font-size:.9rem}.finding .heading{font-size:1rem}.fix ul{margin:.3rem 0;padding-left:1.2rem}ol,ul{margin:.15rem 0}
+:root{color-scheme:light}body{font:14px system-ui,sans-serif;margin:0;background:#f7f9fc;color:#17212b;line-height:1.45}main{max-width:1440px;margin:auto;padding:2rem}h1{margin:0}h2{margin:2.2rem 0 .7rem}section,.overview{background:#fff;border:1px solid #d7dee8;border-radius:10px;padding:1.2rem;margin-top:1rem}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.75rem}.card{background:#fff;border:1px solid #d7dee8;border-radius:8px;padding:.85rem;margin-top:.6rem}.card strong{font-size:1.2rem;display:block}.headline{font-size:1.05rem;font-weight:600}.sub{color:#64748b;font-size:.85rem;margin-top:.15rem}.chips{color:#475569;font-size:.82rem;margin-top:.35rem}.notice{background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:.8rem 1rem;margin-top:.6rem;color:#7c2d12}.chips.warn{background:#fef3c7;border-radius:6px;padding:.35rem .5rem}.fail{color:#b42318}.warning{color:#9a6700}.info{color:#175cd3}.pass{color:#067647}.num{text-align:right;font-variant-numeric:tabular-nums}.empty{color:#94a3b8;font-style:italic;padding:.4rem 0}.q{font-weight:600}.ev{margin:.2rem 0;padding-left:1.1rem;font-size:.82rem}.flow-el{font-size:.82rem;color:#475569}.badge{font-weight:700;font-size:.72rem;padding:.12rem .45rem;border-radius:99px;white-space:nowrap;display:inline-block;margin:.05rem}.badge-critical,.badge-fail,.badge-status-fail{background:#fde8e8;color:#b42318}.badge-high,.badge-status-review{background:#fef3c7;color:#9a6700}.badge-medium{background:#fff4e5;color:#b54708}.badge-low,.badge-info{background:#eef2f7;color:#475569}.badge-status-pass{background:#e6f4ea;color:#067647}.badge-status-not-tested{background:#eef2f7;color:#475569}.badge-status-blocked{background:#fde8e8;color:#b42318}.badge-conf-high{background:#e6f4ea;color:#067647}.badge-conf-medium{background:#fef3c7;color:#9a6700}.badge-conf-low{background:#fde8e8;color:#b42318}.badge-auto{background:#e0edff;color:#175cd3}.badge-manual{background:#f1f5f9;color:#475569}.badge-safe{background:#e6f4ea;color:#067647}.badge-review{background:#fef3c7;color:#9a6700}.badge-high-risk{background:#fde8e8;color:#b42318}.badge-blocked{background:#f8fafc;color:#0f172a;border:1px solid #94a3b8}.badge-flow{background:#ede9fe;color:#6d28d9}.badge-state{background:#e2e8f0;color:#334155}.badge-intent{background:#e0edff;color:#175cd3}.badge-prio{background:#f1f5f9;color:#475569}.badge-risk.safe{background:#e6f4ea;color:#067647}.badge-risk.review{background:#fef3c7;color:#9a6700}.badge-risk.high-risk{background:#fde8e8;color:#b42318}.finding-head{display:flex;flex-wrap:wrap;gap:.3rem;align-items:center}table{border-collapse:collapse;width:100%;background:#fff}td,th{padding:.6rem;border:1px solid #d7dee8;text-align:left;vertical-align:top;word-break:break-word}th{background:#f1f5f9}code{white-space:pre-wrap;font-size:.85em}.finding{font-size:.85rem}.finding .q{font-size:.9rem}.finding .heading{font-size:1rem}.fix ul{margin:.3rem 0;padding-left:1.2rem}ol,ul{margin:.15rem 0}
 </style></head><body><main>
 
 <h1>QA Analysis</h1>
@@ -742,7 +758,7 @@ export function renderQaHtml(analysis: QaAnalysis): string {
   <h2>Executive Summary</h2>
   <p class="headline">${statusBadge(status)} ${escapeHtml(summary.headline)}</p>
   <p class="sub">Analyzed by <code>${escapeHtml(summary.aiProvider)}</code> in ${escapeHtml(summary.mode)} mode on ${escapeHtml(summary.scannedAt)}.</p>
-  <div class="grid">${cards}</div>
+  ${summaryBody}
   ${summary.topRecommendations.length ? `<h3>Top recommended fixes</h3><ol>${summary.topRecommendations.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ol>` : ""}
 </section>
 
@@ -774,7 +790,7 @@ ${performanceSection(analysis)}
 
 <section>
   <h2>QA Findings by Severity</h2>
-  <table><thead><tr><th>Severity</th><th>Description</th><th>Findings</th></tr></thead><tbody>${countTable}</tbody></table>
+  ${blocked ? `<p class="sub">Not assessed — the site was not scanned (see Access Prerequisite).</p>` : `<table><thead><tr><th>Severity</th><th>Description</th><th>Findings</th></tr></thead><tbody>${countTable}</tbody></table>`}
   ${SEVERITY_ORDER.map(({ severity, label }) => `${findings.filter(finding => finding.severity === severity).length ? `<h3>${label} (${findings.filter(finding => finding.severity === severity).length})</h3><table><thead><tr><th>ID</th><th>Lifecycle</th><th>Confidence</th><th>Code</th><th>Finding</th><th>Count</th><th>Evidence</th><th>Example</th></tr></thead><tbody>${findingRows(analysis, severity)}</tbody></table>` : ""}`).join("")}
 </section>
 
