@@ -104,7 +104,8 @@ Options:
   --suite <path>      Load an existing generated-suite JSON instead of regenerating
   --output <path>     QA analysis JSON path (default: reports/qa-analysis.json)
   --execute [spec]    Run the EXECUTOR (finding verification spec) and attach results
-                      (default: ${DEFAULT_VERIFICATION_SPEC}; pass an element-suite spec path
+                      (default: the verification spec, generated fresh for each run in
+                      generated/run-<id>/; pass an element-suite spec path
                       to run the element suite instead, or "none" to skip)
                       When the verification spec runs, executable user flows are also run.
                       NOTE: a user-supplied spec path runs through generic Playwright and is
@@ -215,8 +216,10 @@ Subcommand:
                       malformed, structurally invalid, or failed digest
                       verification.
 
-Verification also writes reports/qa-execution.json (execution + verdicts + evidence).
-Flows also write reports/flows/sc-<flow>.json (safe step outcomes).`;
+Verification also writes qa-execution.json next to the --output file (execution + verdicts + evidence).
+Per-run outcome files and evidence screenshots go to reports/run-artifacts/<id>/verification/ and
+reports/run-artifacts/<id>/flows/ (sc-<flow>.json = safe step outcomes). Runs that write to different
+--output directories can run in parallel; runs sharing one output directory are refused (one at a time).`;
 
 const verifyHelp = `Usage: npm run qa verify -- <path>
 
