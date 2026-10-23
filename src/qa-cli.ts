@@ -21,7 +21,7 @@ import { refreshVerificationRedactor } from "./executor/verify.js";
 import { TaskSkip } from "./executor/tasks.js";
 import { attachFlowExecutions, crawlSite, loadFlowResults, renderFlowSpec } from "./flow/index.js";
 import { resetResultsDir } from "./executor/run-dir.js";
-import { FLOWS_DIR } from "./flow/spec.js";
+import { createRunWorkspace } from "./qa/run-workspace.js";
 import { acquireRunLockForProcess } from "./qa/run-lock.js";
 import { refreshFlowRedactor } from "./flow/execute.js";
 import { FlowLimits, SiteGraph } from "./flow/types.js";
@@ -635,10 +635,11 @@ export async function main(): Promise<void> {
   // configuration failure (exit 1 locally, 2 with --ci) — never a silent pass.
   const perfBudgets = options.perfBudgetsPath ? loadQaPerfBudgets(options.perfBudgetsPath) : null;
 
-  // Runs share generated/*.spec.ts and reports/verification|flows scratch files, so only one
-  // may be active at a time. A second run fails here with a clear message instead of silently
-  // overwriting the first run's outcomes (released automatically on every exit path).
-  if (options.url || options.execute) acquireRunLockForProcess(options.url ?? options.reportPath ?? "report");
+  // Specs, outcome files and Playwright output are per-run (qa/run-workspace.ts). What two runs can
+  // still share is the output directory itself (report file, qa-execution.json, qa-stages.ndjson),
+  // so only one run per output directory may be active; a second one fails here with a clear message
+  // (released automatically on every exit path). Use different --output directories to run in parallel.
+  if (options.url || options.execute) acquireRunLockForProcess(options.url ?? options.reportPath ?? "report", join(dirname(options.outputPath), ".qa-run.lock"));
 
   // Structured stage events travel on a sidecar file next to the report
   // artifacts, mirroring how the execution artifact is derived. Human stdout is
@@ -781,9 +782,12 @@ export async function main(): Promise<void> {
       for (const skip of layer.skipped) {
         console.log(`  SKIPPED ${skip.findingId} (${skip.code}) — ${skip.cause}: ${skip.reason}`);
       }
-      renderVerificationSpec(report, tasks, DEFAULT_VERIFICATION_SPEC);
-      console.log(`Executing verification spec: ${DEFAULT_VERIFICATION_SPEC}`);
-      const run = runVerificationSpec(DEFAULT_VERIFICATION_SPEC, tasks);
+      // Per-run workspace: this run's specs, outcome files and Playwright output never
+      // share paths with another run (see qa/run-workspace.ts).
+      const workspace = createRunWorkspace();
+      renderVerificationSpec(report, tasks, workspace.verificationSpec, { resultsDir: workspace.verificationDir });
+      console.log(`Executing verification spec: ${workspace.verificationSpec}`);
+      const run = runVerificationSpec(workspace.verificationSpec, tasks, { resultsDir: workspace.verificationDir, outputDir: workspace.outputDir });
       let results = run.results;
       if (results.length && typeof provider.triageVerifications === "function") {
         try {
@@ -830,11 +834,11 @@ export async function main(): Promise<void> {
       // Phase 3: run executable user flows and attach their safe outcome files.
       const flowDiscovery = analysis.flowDiscovery;
       if (flowDiscovery && flowDiscovery.flows.some(flow => flow.executable)) {
-        renderFlowSpec(report, flowDiscovery.flows, flowDiscovery.limits, DEFAULT_FLOW_SPEC);
-        resetResultsDir(FLOWS_DIR);
-        const flowExecution = runPlaywright(DEFAULT_FLOW_SPEC);
+        renderFlowSpec(report, flowDiscovery.flows, flowDiscovery.limits, workspace.flowSpec, { resultsDir: workspace.flowsDir });
+        resetResultsDir(workspace.flowsDir);
+        const flowExecution = runPlaywright(workspace.flowSpec, workspace.outputDir);
         if ((flowExecution.tests ?? 0) === 0) console.log(`Flow execution: Playwright ran 0 tests (${flowExecution.status}); flow outcomes will be reported as missing, not reused.`);
-        const flowResults = loadFlowResults(flowDiscovery.flows);
+        const flowResults = loadFlowResults(flowDiscovery.flows, workspace.flowsDir);
         const refinedDiscovery = attachFlowExecutions(flowDiscovery, flowResults);
         analysis = { ...analysis, flowDiscovery: refinedDiscovery, summary: { ...analysis.summary, flowSummary: refinedDiscovery.summary } };
         const fs = refinedDiscovery.summary;
@@ -844,6 +848,7 @@ export async function main(): Promise<void> {
         console.log("Flow execution: no executable flows — every discovered step is REVIEW/HIGH_RISK/BLOCKED.");
       }
       completeStage("verify");
+      workspace.cleanup();
     }
   }
 

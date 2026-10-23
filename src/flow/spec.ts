@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+import { distImportPrefix } from "../qa/run-workspace.js";
 import { atomicWriteText } from "../atomic-write.js";
 import { ScanReport } from "../types.js";
 import { DiscoveredFlow, FlowLimits } from "./types.js";
@@ -15,14 +16,17 @@ import { DiscoveredFlow, FlowLimits } from "./types.js";
 
 export const FLOWS_DIR = "reports/flows";
 
-export function renderFlowSpec(report: ScanReport, flows: DiscoveredFlow[], limits: FlowLimits, outputPath: string): string {
+export function renderFlowSpec(report: ScanReport, flows: DiscoveredFlow[], limits: FlowLimits, outputPath: string, options: { resultsDir?: string } = {}): string {
   const executable = flows.filter(flow => flow.executable);
+  const resultsDir = options.resultsDir ?? FLOWS_DIR;
+  const target = resolve(outputPath);
+  const distPrefix = distImportPrefix(target);
   const spec = `import "dotenv/config";
 import { join } from "node:path";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { test } from "@playwright/test";
-import { runFlow } from "../dist/flow/execute.js";
-import type { DiscoveredFlow } from "../dist/flow/types.js";
+import { runFlow } from "${distPrefix}/flow/execute.js";
+import type { DiscoveredFlow } from "${distPrefix}/flow/types.js";
 
 // AUTO-GENERATED user-flow spec — Phase 3 autonomous flow discovery.
 // Source: ${report.scan.url}
@@ -37,7 +41,7 @@ test.use({
 
 const FLOWS: DiscoveredFlow[] = ${JSON.stringify(executable, null, 2)};
 
-const RESULTS_DIR = join(process.cwd(), ${JSON.stringify(FLOWS_DIR)});
+const RESULTS_DIR = join(process.cwd(), ${JSON.stringify(resultsDir)});
 
 for (const flow of FLOWS) {
   test(\`flow \${flow.flowId} \${flow.category} (\${flow.title})\`, async ({ page }) => {
@@ -48,7 +52,6 @@ for (const flow of FLOWS) {
   });
 }
 `;
-  const target = resolve(outputPath);
   atomicWriteText(target, spec);
   return target;
 }

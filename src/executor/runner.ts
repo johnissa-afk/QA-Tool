@@ -69,7 +69,7 @@ export function summarizePlaywrightJson(raw: unknown): QaExecution {
   };
 }
 
-function runPlaywright(specPath: string): QaExecution {
+function runPlaywright(specPath: string, outputDir?: string): QaExecution {
   const cli = join(process.cwd(), "node_modules", "@playwright", "test", "cli.js");
   // The positional arg is matched as a regex against test file paths, so the
   // spec filter must use forward slashes and escape regex metacharacters.
@@ -80,7 +80,7 @@ function runPlaywright(specPath: string): QaExecution {
   const specFilter = relative.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const startedAt = new Date().toISOString();
   const started = Date.now();
-  const spawned = spawnSync(process.execPath, [cli, "test", specFilter, "--reporter=json"], {
+  const spawned = spawnSync(process.execPath, [cli, "test", specFilter, "--reporter=json", ...(outputDir ? ["--output", outputDir] : [])], {
     encoding: "utf8",
     maxBuffer: 512 * 1024 * 1024,
     timeout: 15 * 60 * 1000,
@@ -122,11 +122,12 @@ function runPlaywright(specPath: string): QaExecution {
 
 export type VerificationRun = { execution: QaExecution; results: VerificationResult[] };
 
-export function runVerificationSpec(specPath: string, tasks: VerificationTask[]): VerificationRun {
+export function runVerificationSpec(specPath: string, tasks: VerificationTask[], options: { resultsDir?: string; outputDir?: string } = {}): VerificationRun {
+  const resultsDir = options.resultsDir ?? VERIFICATION_DIR;
   // Never let a previous run's outcome files (possibly from another site) be
   // mistaken for this run's: scenario IDs repeat across sites.
-  resetResultsDir(VERIFICATION_DIR);
-  let execution = runPlaywright(specPath);
+  resetResultsDir(resultsDir);
+  let execution = runPlaywright(specPath, options.outputDir);
   if (tasks.length > 0 && (execution.tests ?? 0) === 0 && execution.status !== "error") {
     // Tasks were scheduled but Playwright discovered/ran nothing. That is an
     // execution failure, not a clean "skipped" run.
@@ -138,7 +139,7 @@ export function runVerificationSpec(specPath: string, tasks: VerificationTask[])
       ],
     };
   }
-  const results = loadVerificationResults(tasks);
+  const results = loadVerificationResults(tasks, resultsDir);
   const reproduced = results.filter(result => result.status === "REPRODUCED").length;
   const notReproduced = results.filter(result => result.status === "NOT_REPRODUCED").length;
   const review = results.filter(result => result.status === "REVIEW").length;

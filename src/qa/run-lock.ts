@@ -4,11 +4,11 @@ import { dirname, join } from "node:path";
 // ---------------------------------------------------------------------------
 // Single-run lock for the shared scratch space.
 //
-// A QA run writes generated specs (generated/*.spec.ts) and outcome files
-// (reports/verification, reports/flows) at fixed project-relative paths. Two
-// runs at the same time (a terminal run while the dashboard runs one, two
-// terminals) would silently overwrite each other and produce a wrong report.
-// The lock makes the second run fail fast with a clear message instead.
+// Specs, outcome files and Playwright output are per-run (run-workspace.ts), but
+// two runs writing to the SAME output directory still share the report file,
+// qa-execution.json and the stage-event sidecar. The lock (one per output
+// directory) makes the second such run fail fast with a clear message instead
+// of silently overwriting the first run's files.
 //
 //  - A lock whose process is gone (crash, kill -9) is stale and taken over.
 //  - A lock older than MAX_LOCK_AGE_MS is treated as stale even if the pid is
@@ -82,8 +82,9 @@ export function acquireRunLock(options: RunLockOptions): RunLock {
     if (live && env.QA_FORCE_RUN !== "1") {
       throw new Error(
         `Another QA run is already in progress (pid ${holder!.pid}, started ${holder!.startedAt}, target ${holder!.target}). ` +
-          `Runs share generated/ and reports/ scratch files and cannot overlap. Wait for it to finish; ` +
-          `if it is stuck, stop that process, or set QA_FORCE_RUN=1 to override.`,
+          `Runs writing to the same output directory share the report, qa-execution.json and stage-event files and cannot overlap. ` +
+          `Wait for it to finish, use a different --output directory to run in parallel, ` +
+          `or (if it is stuck) stop that process or set QA_FORCE_RUN=1 to override.`,
       );
     }
     // Stale, corrupt, our own, or forced: remove and retry.
@@ -93,8 +94,8 @@ export function acquireRunLock(options: RunLockOptions): RunLock {
 }
 
 /** Acquire the lock for this process and release it on every normal exit path. */
-export function acquireRunLockForProcess(target: string): RunLock {
-  const lock = acquireRunLock({ target });
+export function acquireRunLockForProcess(target: string, file?: string): RunLock {
+  const lock = acquireRunLock({ target, file });
   process.on("exit", () => lock.release());
   for (const [signal, code] of [["SIGINT", 130], ["SIGTERM", 143]] as const) {
     // Do not override a handler someone else installed.

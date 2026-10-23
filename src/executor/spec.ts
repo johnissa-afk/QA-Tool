@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+import { distImportPrefix } from "../qa/run-workspace.js";
 import { atomicWriteText } from "../atomic-write.js";
 import { ScanReport } from "../types.js";
 import { VerificationTask } from "./tasks.js";
@@ -15,13 +16,16 @@ import { VerificationTask } from "./tasks.js";
 // ---------------------------------------------------------------------------
 export const VERIFICATION_DIR = "reports/verification";
 
-export function renderVerificationSpec(report: ScanReport, tasks: VerificationTask[], outputPath: string): string {
+export function renderVerificationSpec(report: ScanReport, tasks: VerificationTask[], outputPath: string, options: { resultsDir?: string } = {}): string {
+  const resultsDir = options.resultsDir ?? VERIFICATION_DIR;
+  const target = resolve(outputPath);
+  const distPrefix = distImportPrefix(target);
   const spec = `import "dotenv/config";
 import { join } from "node:path";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { test } from "@playwright/test";
-import { runVerification } from "../dist/executor/verify.js";
-import type { VerificationTask } from "../dist/executor/tasks.js";
+import { runVerification } from "${distPrefix}/executor/verify.js";
+import type { VerificationTask } from "${distPrefix}/executor/tasks.js";
 
 // AUTO-GENERATED finding-verification spec — EXECUTOR layer of the QA platform.
 // Source: ${report.scan.url}
@@ -38,18 +42,17 @@ const TARGET_URL = ${JSON.stringify(report.scan.url)};
 
 const TASKS: VerificationTask[] = ${JSON.stringify(tasks, null, 2)};
 
-const RESULTS_DIR = join(process.cwd(), ${JSON.stringify(VERIFICATION_DIR)});
+const RESULTS_DIR = join(process.cwd(), ${JSON.stringify(resultsDir)});
 
 for (const task of TASKS) {
   test(\`verify \${task.scenarioId} \${task.code}\`, async ({ page }) => {
     test.setTimeout(60000);
-    const result = await runVerification(page, task, { targetUrl: TARGET_URL, screenshotDir: ${JSON.stringify(VERIFICATION_DIR)} });
+    const result = await runVerification(page, task, { targetUrl: TARGET_URL, screenshotDir: ${JSON.stringify(resultsDir)} });
     mkdirSync(RESULTS_DIR, { recursive: true });
     writeFileSync(join(RESULTS_DIR, \`\${task.scenarioId}.json\`), JSON.stringify(result));
   });
 }
 `;
-  const target = resolve(outputPath);
   atomicWriteText(target, spec);
   return target;
 }
