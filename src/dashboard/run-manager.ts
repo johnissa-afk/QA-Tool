@@ -95,6 +95,15 @@ export type RunScheduling = {
   scheduledExecutionId?: string | null;
 };
 
+export const MAX_CONCURRENT_RUNS_LIMIT = 4;
+
+/** Parses a configured run limit; anything missing or invalid means the safe default of 1. */
+export function parseMaxConcurrentRuns(raw: unknown): number {
+  const value = typeof raw === "number" ? raw : typeof raw === "string" && raw.trim() !== "" ? Number(raw) : NaN;
+  if (!Number.isInteger(value) || value < 1) return 1;
+  return Math.min(value, MAX_CONCURRENT_RUNS_LIMIT);
+}
+
 export type RunManagerOptions = {
   /** Project root that holds src/qa-cli.ts and node_modules. */
   projectRoot: string;
@@ -104,6 +113,13 @@ export type RunManagerOptions = {
   historyDir: string;
   /** Injectable child spawner; tests use it to avoid a real browser. */
   spawnImpl?: typeof spawn;
+  /**
+   * How many runs may be active at once (1..MAX_CONCURRENT_RUNS_LIMIT). Defaults to 1, which keeps
+   * the original one-run-at-a-time behaviour. Every run already owns its own report directory,
+   * generated specs, outcome files and Playwright output (qa/run-workspace.ts), so runs do not
+   * share files; the limit exists to bound CPU and memory (each run drives real browsers).
+   */
+  maxConcurrentRuns?: number;
   /** Called once a run has been created, before the engine is polled. */
   onRunStarted?: (run: QaRun) => void;
   /**
@@ -164,15 +180,18 @@ export function validateRunUrl(raw: unknown): string | null {
 const sanitizeRunId = (runId: string): string => runId.replace(/[^A-Za-z0-9._-]/g, "");
 
 /**
- * A run owns the shared scratch space the CLI writes into
- * (generated/*.spec.ts, reports/flows/*), so exactly one run may be active at
- * a time. Returns the active run so the caller can report a conflict.
+ * Starts and tracks QA runs. Each run owns its report directory and, inside the
+ * engine, its own generated specs, outcome files and Playwright output, so runs
+ * do not interfere with each other. `maxConcurrentRuns` (default 1) bounds how
+ * many may be active at once; two runs of the same website are never active
+ * together.
  */
 export class RunManager {
-  private readonly options: Required<Omit<RunManagerOptions, "spawnImpl" | "onRunStarted" | "onRunSettled">> & Pick<RunManagerOptions, "spawnImpl" | "onRunStarted" | "onRunSettled">;
+  private readonly options: Required<Omit<RunManagerOptions, "spawnImpl" | "onRunStarted" | "onRunSettled" | "maxConcurrentRuns">> & Pick<RunManagerOptions, "spawnImpl" | "onRunStarted" | "onRunSettled">;
   private readonly runs = new Map<string, QaRun>();
   private readonly order: string[] = [];
   private readonly MAX_RUNS = 20;
+  private readonly maxConcurrentRuns: number;
   /** Per-run read offset into the sidecar event channel. */
   private readonly stageCursor = new Map<string, number>();
   private readonly stageTimers = new Map<string, NodeJS.Timeout>();
@@ -180,6 +199,7 @@ export class RunManager {
   private readonly children = new Map<string, ReturnType<typeof spawn>>();
 
   constructor(options: RunManagerOptions) {
+    this.maxConcurrentRuns = parseMaxConcurrentRuns(options.maxConcurrentRuns);
     this.options = {
       projectRoot: resolve(options.projectRoot),
       runsDir: resolve(options.runsDir),
@@ -199,6 +219,18 @@ export class RunManager {
     return null;
   }
 
+  /** Every run currently executing, newest first. */
+  activeRuns(): QaRun[] {
+    return this.order
+      .map(id => this.runs.get(id))
+      .filter((run): run is QaRun => run !== undefined && run.state === "RUNNING");
+  }
+
+  /** The executing run that belongs to a project, if any. */
+  runForProject(projectId: string): QaRun | null {
+    return this.activeRuns().find(run => run.projectId === projectId) ?? null;
+  }
+
   get(runId: string): QaRun | null {
     return this.runs.get(sanitizeRunId(runId)) ?? null;
   }
@@ -213,8 +245,14 @@ export class RunManager {
     const url = validateRunUrl(rawUrl);
     if (url === null) return { ok: false, status: 400, error: "Enter a valid http:// or https:// website URL." };
 
-    const active = this.activeRun();
-    if (active) return { ok: false, status: 409, error: `A QA run is already in progress (${active.runId}). Wait for it to finish.` };
+    const running = this.activeRuns();
+    if (running.length >= this.maxConcurrentRuns) {
+      return this.maxConcurrentRuns === 1
+        ? { ok: false, status: 409, error: `A QA run is already in progress (${running[0]!.runId}). Wait for it to finish.` }
+        : { ok: false, status: 409, error: `The limit of ${this.maxConcurrentRuns} concurrent QA runs is reached (${running.map(run => run.runId).join(", ")}). Wait for one to finish.` };
+    }
+    const sameSite = running.find(run => run.url === url);
+    if (sameSite) return { ok: false, status: 409, error: `A QA run for this website is already in progress (${sameSite.runId}). Wait for it to finish.` };
 
     const runId = `web-${Date.now().toString(36)}-${randomBytes(4).toString("hex")}`;
     const runDir = join(this.options.runsDir, runId);

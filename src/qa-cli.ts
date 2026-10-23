@@ -51,6 +51,7 @@ import { buildArtifactInventory, renderArtifactInventory } from "./qa/artifacts.
 import { createStageEventEmitter, QaStage, QaStageEmitter, STAGE_EVENT_FILENAME } from "./qa/stages.js";
 import { atomicWriteText } from "./atomic-write.js";
 import { DashboardOptions, serveUntilClosed } from "./dashboard/server.js";
+import { MAX_CONCURRENT_RUNS_LIMIT } from "./dashboard/run-manager.js";
 
 
 
@@ -201,11 +202,13 @@ Configuration:
 
 Subcommand:
   serve|dash [--dir <dir>] [--history-dir <path>] [--port <n>] [--host <host>]
-             [--baseline-max-age <dur>]
+             [--baseline-max-age <dur>] [--max-runs <n>]
                       Phase 8B: serve the local QA dashboard (reads the report +
                       history artifacts read-only; binds to 127.0.0.1 by default).
                       --baseline-max-age enables the Phase 10D rotation position
                       in the home-view baseline trust card.
+                      --max-runs lets the dashboard run up to <n> scans at once (1-4, default 1;
+                      also QA_MAX_CONCURRENT_RUNS). Two runs of the same site never overlap.
   verify <path>       Phase 10: offline baseline verification. Loads a baseline
                       artifact exactly as --baseline does — structure validation
                       always, sha256 integrity against <path>.meta.json when the
@@ -614,9 +617,15 @@ export async function main(): Promise<void> {
     const maxAgeIndex = args.indexOf("--baseline-max-age");
     const baselineMaxAge = maxAgeIndex >= 0 && args[maxAgeIndex + 1] ? args[maxAgeIndex + 1] : null;
     if (baselineMaxAge != null) parseBaselineMaxAge(baselineMaxAge);
+    const maxRunsIndex = args.indexOf("--max-runs");
+    const maxConcurrentRuns = maxRunsIndex >= 0 && args[maxRunsIndex + 1] ? Number(args[maxRunsIndex + 1]) : undefined;
+    if (maxConcurrentRuns !== undefined && (!Number.isInteger(maxConcurrentRuns) || maxConcurrentRuns < 1 || maxConcurrentRuns > MAX_CONCURRENT_RUNS_LIMIT)) {
+      throw new Error(`--max-runs must be an integer between 1 and ${MAX_CONCURRENT_RUNS_LIMIT}.`);
+    }
     const dashboardOptions: DashboardOptions = {
       reportDir,
       historyDir,
+      maxConcurrentRuns,
       host: hostIndex >= 0 && args[hostIndex + 1] ? args[hostIndex + 1] : "127.0.0.1",
       port,
       baselineMaxAge,

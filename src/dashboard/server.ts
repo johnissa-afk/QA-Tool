@@ -17,7 +17,7 @@ import { validateRunSnapshot } from "../history/validate.js";
 import { findingDetail, gateMinSeverityOf, listFindings, RunArtifact } from "./evidence.js";
 import { evaluateGate } from "../qa/gate.js";
 import { parseBaselineMaxAge, verifyBaseline } from "../qa/baseline.js";
-import { RunManager, RUN_STAGES, type QaRun } from "./run-manager.js";
+import { RunManager, RUN_STAGES, parseMaxConcurrentRuns, type QaRun } from "./run-manager.js";
 import { defaultProjectsPath, ProjectStore } from "./projects.js";
 import { defaultSchedulesPath, frequencyLabel, ScheduleStore, SCHEDULE_FREQUENCIES, type ScheduleFrequency, type ScheduledExecution } from "./project-schedules.js";
 import { artifactProof, Scheduler } from "./scheduler.js";
@@ -54,6 +54,8 @@ export type DashboardOptions = {
   /** Phase 10D: baseline rotation policy duration (e.g. "30d"); enables the
    *  staleness position in the home-view baseline trust card. */
   baselineMaxAge?: string | null;
+  /** How many QA runs the dashboard may execute at once (default 1; also QA_MAX_CONCURRENT_RUNS). */
+  maxConcurrentRuns?: number;
   /** Phase 12: project root holding src/qa-cli.ts; enables QA run execution. */
   projectRoot?: string;
   /** Phase 12: test seam for the run manager's child spawner. */
@@ -417,6 +419,7 @@ export function startDashboard(options: DashboardOptions): Promise<DashboardServ
     runsDir,
     historyDir,
     spawnImpl: options.spawnImpl,
+    maxConcurrentRuns: parseMaxConcurrentRuns(options.maxConcurrentRuns ?? process.env.QA_MAX_CONCURRENT_RUNS),
     onRunStarted: run => {
       const project = run.projectId ? projects.get(run.projectId) : null;
       if (project) projects.runStarted(project, run);
@@ -990,7 +993,7 @@ export function startDashboard(options: DashboardOptions): Promise<DashboardServ
         return;
       }
       if (pathname === "/api/qa/runs") {
-        return sendJson(res, 200, { ok: true, runs: runManager.list(), active: runManager.activeRun() });
+        return sendJson(res, 200, { ok: true, runs: runManager.list(), active: runManager.activeRun(), activeRuns: runManager.activeRuns() });
       }
       const qaRunMatch = pathname.match(/^\/api\/qa\/runs\/([^/]+)(?:\/(results|report\.html|report|execution|findings(?:\/[^/]+)?))?$/);
       if (qaRunMatch) {

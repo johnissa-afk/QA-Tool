@@ -4,7 +4,7 @@ import { EventEmitter } from "node:events";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { RUN_STAGES, RunManager, stageFromLine, validateRunUrl } from "../dashboard/run-manager.js";
+import { MAX_CONCURRENT_RUNS_LIMIT, RUN_STAGES, RunManager, parseMaxConcurrentRuns, stageFromLine, validateRunUrl } from "../dashboard/run-manager.js";
 
 const tmp = (): string => mkdtempSync(join(tmpdir(), "ai-website-qa-runmanager-"));
 
@@ -222,4 +222,81 @@ test("get sanitizes run ids so traversal can never resolve a run", () => {
   if (!result.ok) return;
   assert.equal(mgr.get("../../package"), null);
   assert.ok(mgr.get(result.run.runId));
+});
+
+
+// --- Concurrent runs ------------------------------------------------------------
+
+const concurrentManager = (maxConcurrentRuns: number): { mgr: RunManager; children: FakeChild[] } => {
+  const dir = tmp();
+  const runsDir = join(dir, "runs");
+  mkdirSync(runsDir, { recursive: true });
+  const { spawnImpl, children } = fakeSpawner();
+  return { mgr: new RunManager({ projectRoot: process.cwd(), runsDir, historyDir: join(dir, "history"), spawnImpl, maxConcurrentRuns }), children };
+};
+
+test("the default stays one run at a time, with the original message", () => {
+  const { mgr } = drivenManager();
+  assert.equal(mgr.start("https://qa.test/one").ok, true);
+  const second = mgr.start("https://qa.test/two");
+  assert.equal(second.ok, false);
+  if (!second.ok) assert.match(second.error, /A QA run is already in progress \(web-/);
+});
+
+test("parseMaxConcurrentRuns defaults to 1 and clamps to the supported range", () => {
+  assert.equal(parseMaxConcurrentRuns(undefined), 1);
+  assert.equal(parseMaxConcurrentRuns(""), 1);
+  assert.equal(parseMaxConcurrentRuns("abc"), 1);
+  assert.equal(parseMaxConcurrentRuns(0), 1);
+  assert.equal(parseMaxConcurrentRuns(-3), 1);
+  assert.equal(parseMaxConcurrentRuns(2.5), 1);
+  assert.equal(parseMaxConcurrentRuns("2"), 2);
+  assert.equal(parseMaxConcurrentRuns(3), 3);
+  assert.equal(parseMaxConcurrentRuns(99), MAX_CONCURRENT_RUNS_LIMIT);
+});
+
+test("with a limit of 2, two different sites run together and a third is refused", () => {
+  const { mgr, children } = concurrentManager(2);
+  const a = mgr.start("https://qa.test/a", "prj-a");
+  const b = mgr.start("https://qa.test/b", "prj-b");
+  assert.equal(a.ok && b.ok, true);
+  assert.equal(children.length, 2);
+  assert.equal(mgr.activeRuns().length, 2);
+  const outputs = children.map(outputPathOf);
+  assert.notEqual(outputs[0], outputs[1], "each run writes to its own report directory");
+  const third = mgr.start("https://qa.test/c");
+  assert.equal(third.ok, false);
+  if (!third.ok) { assert.equal(third.status, 409); assert.match(third.error, /limit of 2 concurrent QA runs/); }
+  assert.equal(children.length, 2, "a refused run never spawns a child");
+});
+
+test("the same website never runs twice at once, even with spare capacity", () => {
+  const { mgr, children } = concurrentManager(3);
+  assert.equal(mgr.start("https://qa.test/a").ok, true);
+  const again = mgr.start("https://qa.test/a");
+  assert.equal(again.ok, false);
+  if (!again.ok) assert.match(again.error, /for this website is already in progress/);
+  assert.equal(children.length, 1);
+});
+
+test("runForProject finds a project's run even when it is not the newest active run", () => {
+  const { mgr } = concurrentManager(2);
+  mgr.start("https://qa.test/a", "prj-a");
+  mgr.start("https://qa.test/b", "prj-b");
+  assert.equal(mgr.activeRun()?.projectId, "prj-b", "activeRun() is still just the newest active run");
+  assert.equal(mgr.runForProject("prj-a")?.url, "https://qa.test/a");
+  assert.equal(mgr.runForProject("prj-b")?.url, "https://qa.test/b");
+  assert.equal(mgr.runForProject("prj-missing"), null);
+});
+
+test("when one of two concurrent runs finishes, capacity frees up and the other keeps running", () => {
+  const { mgr, children } = concurrentManager(2);
+  mgr.start("https://qa.test/a");
+  mgr.start("https://qa.test/b");
+  writeReport(children[0]!, reportFixture());
+  children[0]!.emit("close", 0);
+  assert.equal(mgr.activeRuns().length, 1);
+  assert.equal(mgr.activeRuns()[0]!.url, "https://qa.test/b");
+  assert.equal(mgr.start("https://qa.test/c").ok, true);
+  assert.equal(mgr.activeRuns().length, 2);
 });

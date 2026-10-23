@@ -196,7 +196,7 @@ export class Scheduler {
     // skip for the slot it would have consumed instead of being claimed and
     // then failed by the run manager's single-run rule.
     if (this.isBusy(schedule.projectId)) {
-      const active = this.options.runManager.activeRun();
+      const active = this.options.runManager.runForProject(schedule.projectId);
       const recorded = this.options.schedules.recordSkippedOverlap(
         schedule.projectId,
         schedule.nextRunAt ?? new Date(nowMs).toISOString(),
@@ -249,7 +249,7 @@ export class Scheduler {
     // real slot's execution record, and after the project check so a missing
     // project reports the reason it actually has.
     if (this.isBusy(project.id)) {
-      const active = this.options.runManager.activeRun();
+      const active = this.options.runManager.runForProject(project.id);
       const recorded = this.options.schedules.recordSkippedOverlap(
         project.id,
         scheduledFor,
@@ -317,8 +317,9 @@ export class Scheduler {
 
   /** True when this project already has work in progress, from either source. */
   private isBusy(projectId: string): boolean {
-    const active = this.options.runManager.activeRun();
-    if (active && active.projectId === projectId) return true;
+    // Any of the project's own runs counts, not just the newest active one: with
+    // concurrent runs another project's run may be the first active run.
+    if (this.options.runManager.runForProject(projectId)) return true;
     return this.options.schedules.isDispatching(projectId);
   }
 
