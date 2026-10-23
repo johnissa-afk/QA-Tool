@@ -9,7 +9,7 @@ import { FlowAnalysisEnhancement, DiscoveredFlow, FlowDiscovery, FlowExecutionRe
 // ---------------------------------------------------------------------------
 
 export function emptyFlowSummary(): FlowSummary {
-  return { pages: 0, flows: 0, executable: 0, review: 0, highRisk: 0, blocked: 0, steps: 0, executed: 0, passed: 0, reproduced: 0, notReproduced: 0, reviewRequired: 0, infrastructure: 0 };
+  return { pages: 0, flows: 0, executable: 0, review: 0, highRisk: 0, blocked: 0, steps: 0, executed: 0, passed: 0, reproduced: 0, notReproduced: 0, reviewRequired: 0, boundaryBlocked: 0, infrastructure: 0 };
 }
 
 export function summarizeFlows(flows: DiscoveredFlow[], executions: FlowExecutionResult[], pages: number): FlowSummary {
@@ -26,6 +26,7 @@ export function summarizeFlows(flows: DiscoveredFlow[], executions: FlowExecutio
   summary.reproduced = executions.filter(result => result.status === "REPRODUCED").length;
   summary.notReproduced = executions.filter(result => result.status === "NOT_REPRODUCED").length;
   summary.reviewRequired = executions.filter(result => result.status === "REVIEW_REQUIRED").length;
+  summary.boundaryBlocked = executions.filter(result => result.status === "BLOCKED").length;
   summary.infrastructure = executions.filter(result => result.status === "INFRASTRUCTURE_PROBLEM").length;
   return summary;
 }

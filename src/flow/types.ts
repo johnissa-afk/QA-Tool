@@ -235,6 +235,8 @@ export type FlowSummary = {
   reproduced: number;
   notReproduced: number;
   reviewRequired: number;
+  /** Executions stopped at a safety boundary (status BLOCKED). */
+  boundaryBlocked?: number;
   infrastructure: number;
 };
 

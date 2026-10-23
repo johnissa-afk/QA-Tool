@@ -866,7 +866,7 @@ export async function main(): Promise<void> {
         const refinedDiscovery = attachFlowExecutions(flowDiscovery, flowResults);
         analysis = { ...analysis, flowDiscovery: refinedDiscovery, summary: { ...analysis.summary, flowSummary: refinedDiscovery.summary } };
         const fs = refinedDiscovery.summary;
-        console.log(`Flow execution: ${fs.executed} flow(s) run — ${fs.passed} passed, ${fs.reproduced} reproduced, ${fs.notReproduced} not reproduced, ${fs.reviewRequired} review required, ${fs.infrastructure} infrastructure.`);
+        console.log(`Flow execution: ${fs.executed} flow(s) run — ${fs.passed} passed, ${fs.reproduced} reproduced, ${fs.notReproduced} not reproduced, ${fs.reviewRequired} review required, ${fs.boundaryBlocked ?? 0} blocked at a safety boundary, ${fs.infrastructure} infrastructure.`);
         if (!analysis.accessPrerequisite) analysis = { ...analysis, summary: { ...analysis.summary, ...explainStatus(analysis) } };
       } else if (analysis.flowDiscovery) {
         console.log("Flow execution: no executable flows — every discovered step is REVIEW/HIGH_RISK/BLOCKED.");

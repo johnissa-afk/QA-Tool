@@ -13,7 +13,8 @@ import { buildSiteGraphFromReport, mergeGraphs, normalizeUrl } from "../flow/ind
 import { discoverFlows } from "../flow/index.js";
 import { crawlSite } from "../flow/index.js";
 import { runFlow } from "../flow/index.js";
-import { defaultFlowLimits } from "../flow/index.js";
+import { defaultFlowLimits, summarizeFlows } from "../flow/index.js";
+import type { FlowExecutionResult } from "../flow/index.js";
 
 // ---------------------------------------------------------------------------
 // Phase 3 fixture tests (generic sites A–J). All fixtures use the synthetic
@@ -473,4 +474,23 @@ test("flowBoundaryReason explains why a step is not executed", () => {
   const reason = flowBoundaryReason({ safety: "HIGH_RISK", automation: "MANUAL", reason: "credential input (password) — never auto-filled" });
   assert.ok(reason.startsWith("Not executable"), reason);
   assert.ok(reason.includes("credential input"), reason);
+});
+
+test("summarizeFlows accounts for every execution status", () => {
+  const executions = [
+    { status: "PASS" },
+    { status: "REPRODUCED" },
+    { status: "NOT_REPRODUCED" },
+    { status: "REVIEW_REQUIRED" },
+    { status: "BLOCKED" },
+    { status: "BLOCKED" },
+    { status: "INFRASTRUCTURE_PROBLEM" },
+  ] as FlowExecutionResult[];
+  const summary = summarizeFlows([], executions, 1);
+  assert.equal(summary.executed, executions.length);
+  assert.equal(
+    summary.passed + summary.reproduced + summary.notReproduced + summary.reviewRequired + (summary.boundaryBlocked ?? 0) + summary.infrastructure,
+    summary.executed,
+  );
+  assert.equal(summary.boundaryBlocked, 2);
 });
