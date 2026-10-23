@@ -53,6 +53,40 @@ export type ProviderFailureReason =
   | "schema-invalid"
   | "no-change";
 
+/**
+ * A well-formed response that simply had nothing to refine. This is NOT a
+ * failure: the model worked, the schema matched, and the deterministic draft
+ * was already good. It is kept distinct from `schema-invalid` so a healthy run
+ * does not warn the operator to check keys, URLs, or the network.
+ */
+export const NO_CHANGE = Symbol("no-change");
+export type NoChange = typeof NO_CHANGE;
+
+/**
+ * True when `raw` carries a recognised envelope but every recognised field is
+ * empty. A non-empty field that the validator then rejected stays
+ * `schema-invalid` (the model produced data in the wrong shape).
+ */
+const isEmptyEnvelope = (raw: unknown, keys: string[]): boolean => {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return false;
+  const record = raw as Record<string, unknown>;
+  // `{}` carries no claims at all: it is the common "nothing to refine" reply,
+  // not a schema violation worth warning the operator about.
+  if (Object.keys(record).length === 0) return true;
+  let recognised = false;
+  for (const key of keys) {
+    if (!(key in record)) continue;
+    recognised = true;
+    const value = record[key];
+    if (value === null || value === undefined) continue;
+    if (typeof value === "string") { if (value.trim()) return false; continue; }
+    if (Array.isArray(value)) { if (value.length) return false; continue; }
+    if (typeof value === "object") { if (Object.keys(value as object).length) return false; continue; }
+    return false;
+  }
+  return recognised;
+};
+
 const RETRYABLE_STATUS = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
 const MAX_ATTEMPTS = 3;
 const BASE_BACKOFF_MS = 250;
@@ -88,14 +122,27 @@ export class OpenAICompatibleProvider implements AIProvider {
     model?: string,
   ) {
     const trimmedUrl = apiUrl?.trim();
-    this.apiUrl = trimmedUrl && /^https?:\/\//i.test(trimmedUrl) ? trimmedUrl : DEFAULT_API_URL;
+    if (trimmedUrl && !/^https?:\/\//i.test(trimmedUrl)) {
+      // Never silently retarget the key at a different host than configured.
+      console.warn(`AI provider: AI_API_URL is not an http(s) URL; ignoring it and using ${DEFAULT_API_URL}.`);
+      this.apiUrl = DEFAULT_API_URL;
+    } else {
+      this.apiUrl = trimmedUrl || DEFAULT_API_URL;
+    }
     this.model = model?.trim() || DEFAULT_MODEL;
     this.name = `${this.model} (openai-compatible)`;
   }
 
   /** Stages whose last call failed, for a single end-of-run diagnostic line. */
   failedStages(): string[] {
-    return [...this.failures.entries()].filter(([, reason]) => reason !== "no-change").map(([stage]) => stage);
+    return this.failedStageDetails().map(({ stage }) => stage);
+  }
+
+  /** The same stages with their concrete, non-secret failure reasons. */
+  failedStageDetails(): { stage: string; reason: ProviderFailureReason }[] {
+    return [...this.failures.entries()]
+      .filter(([, reason]) => reason !== "no-change")
+      .map(([stage, reason]) => ({ stage, reason }));
   }
 
   private noteFailure(stage: string, reason: ProviderFailureReason): null {
@@ -108,11 +155,11 @@ export class OpenAICompatibleProvider implements AIProvider {
   }
 
   /**
-   * Issues one bounded chat-completion call and returns the parsed JSON body.
-   * `parse` validates the payload; returning null from `parse` is a
-   * `schema-invalid` no-op, not an error.
-   */
-  private async postJson<T>(stage: string, system: string, user: string, parse: (raw: unknown) => T | null): Promise<T | null> {
+    * Issues one bounded chat-completion call and returns the parsed JSON body.
+    * `parse` returns `NO_CHANGE` for a valid response with nothing to refine
+    * (not a failure) and `null` only when the payload's shape is unusable.
+    */
+  private async postJson<T>(stage: string, system: string, user: string, parse: (raw: unknown) => T | NoChange | null): Promise<T | null> {
     const payload = { model: this.model, temperature: 0, messages: [{ role: "system", content: system }, { role: "user", content: user }] };
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -161,6 +208,7 @@ export class OpenAICompatibleProvider implements AIProvider {
       }
 
       const value = parse(parsed);
+      if (value === NO_CHANGE) return this.noteFailure(stage, "no-change");
       if (value === null) return this.noteFailure(stage, "schema-invalid");
       this.noteSuccess(stage);
       return value;
@@ -184,14 +232,17 @@ export class OpenAICompatibleProvider implements AIProvider {
       "Respond ONLY with a single JSON object matching the provided schema and nothing else.",
     ].join("\n");
 
+    const redactor = buildRedactor();
+    const data = redactObject({ findings: context.findings, flows: context.flows, scenarios: context.scenarios }, redactor);
     const user = [
       `Here is the deterministic draft for ${context.url} (title: "${context.title}").`,
       `Severity must stay within one level of the current value. Do not echo secrets.`,
       `Schema: {"findings":[{"findingId":"QA-F-001","severity":"HIGH","confidence":"high","recommendation":"string","userImpact":"string","rationale":"string"}],"flows":[{"flowId":"UF-SEARCH-001","title":"string","description":"string","status":"identified|blocked","blockReason":"string"}],"scenarios":[{"scenarioId":"SC-SEARCH-001","title":"string","description":"string","priority":"P1"}],"summary":{"headline":"string","topRecommendations":["string"]}}`,
-      `Data: ${JSON.stringify({ findings: context.findings, flows: context.flows, scenarios: context.scenarios })}`,
+      `Data: ${JSON.stringify(data)}`,
     ].join("\n");
 
-    return this.postJson("enhance", system, user, validateEnhancement);
+    return this.postJson("enhance", system, user, raw =>
+      validateEnhancement(raw) ?? (isEmptyEnvelope(raw, ["findings", "flows", "scenarios", "summary"]) ? NO_CHANGE : null));
   }
 
   async triageVerifications(results: VerificationResult[], context: { url: string; title: string }): Promise<VerificationResult[] | null> {
@@ -232,7 +283,7 @@ export class OpenAICompatibleProvider implements AIProvider {
       "- INFRASTRUCTURE_PROBLEM only for runner, browser, network, or timeout failures.",
       "- REVIEW_REQUIRED when the evidence is insufficient to decide.",
       "Never invent DOM details. Never echo credentials, tokens, or API keys.",
-      'Respond ONLY with JSON matching {"verdicts":[{"findingId":"...","verdict":"LIKELY_DEFECT","reason":"one sentence","confidence":"high"}],"":""}.',
+      'Respond ONLY with JSON matching {"verdicts":[{"findingId":"...","verdict":"LIKELY_DEFECT","reason":"one sentence","confidence":"high"}]}.',
     ].join("\n");
 
     const user = [
@@ -240,7 +291,14 @@ export class OpenAICompatibleProvider implements AIProvider {
       `Data: ${JSON.stringify(summaries)}`,
     ].join("\n");
 
-    const entries = await this.postJson("triage", system, user, validateTriageEntries);
+    const entries = await this.postJson("triage", system, user, raw => {
+      // A malformed shape is a schema failure; a well-formed empty verdict list
+      // means the deterministic verdicts were already correct.
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+      if (!Array.isArray((raw as { verdicts?: unknown }).verdicts)) return null;
+      const parsed = validateTriageEntries(raw);
+      return parsed.length ? parsed : NO_CHANGE;
+    });
     if (!entries?.length) return null;
     const triaged = results.map(result => {
       const entry = entries.find(item => item.findingId === result.findingId);
@@ -268,10 +326,11 @@ export class OpenAICompatibleProvider implements AIProvider {
 
     const user = [
       `Site: ${context.url} (title: "${context.title}").`,
-      `Data: ${JSON.stringify(flows)}`,
+      `Data: ${JSON.stringify(redactObject(flows, buildRedactor()))}`,
     ].join("\n");
 
-    return this.postJson("analyze-flows", system, user, validateFlowAnalysis);
+    return this.postJson("analyze-flows", system, user, raw =>
+      validateFlowAnalysis(raw) ?? (isEmptyEnvelope(raw, ["flows"]) ? NO_CHANGE : null));
   }
 
   async analyzeCoverage(digest: CoverageDigest, context: { url: string; title: string }): Promise<CoverageEnhancement | null> {
@@ -288,10 +347,11 @@ export class OpenAICompatibleProvider implements AIProvider {
 
     const user = [
       `Site: ${context.url} (title: "${context.title}").`,
-      `Data: ${JSON.stringify(digest)}`,
+      `Data: ${JSON.stringify(redactObject(digest, buildRedactor()))}`,
     ].join("\n");
 
-    return this.postJson("coverage", system, user, validateCoverageEnhancement);
+    return this.postJson("coverage", system, user, raw =>
+      validateCoverageEnhancement(raw) ?? (isEmptyEnvelope(raw, ["gaps", "prioritization"]) ? NO_CHANGE : null));
   }
 
   async analyzeRegression(digest: RegressionDigest, context: { url: string; title: string }): Promise<RegressionEnhancement | null> {
@@ -308,10 +368,11 @@ export class OpenAICompatibleProvider implements AIProvider {
 
     const user = [
       `Site: ${context.url} (title: "${context.title}").`,
-      `Data: ${JSON.stringify(digest)}`,
+      `Data: ${JSON.stringify(redactObject(digest, buildRedactor()))}`,
     ].join("\n");
 
-    return this.postJson("regression", system, user, validateRegressionEnhancement);
+    return this.postJson("regression", system, user, raw =>
+      validateRegressionEnhancement(raw) ?? (isEmptyEnvelope(raw, ["headline", "notes"]) ? NO_CHANGE : null));
   }
 
   async analyzeIntelligence(digest: IntelligenceDigest, context: { url: string; title: string }): Promise<IntelligenceEnhancement | null> {
@@ -328,10 +389,11 @@ export class OpenAICompatibleProvider implements AIProvider {
 
     const user = [
       `Site: ${context.url} (title: "${context.title}").`,
-      `Data: ${JSON.stringify(digest)}`,
+      `Data: ${JSON.stringify(redactObject(digest, buildRedactor()))}`,
     ].join("\n");
 
-    return this.postJson("intelligence", system, user, validateIntelligenceEnhancement);
+    return this.postJson("intelligence", system, user, raw =>
+      validateIntelligenceEnhancement(raw) ?? (isEmptyEnvelope(raw, ["wording"]) ? NO_CHANGE : null));
   }
 
   async analyzeHistoricalIntelligence(digest: HistoricalIntelligenceDigest, context: { url: string; title: string }): Promise<HistoricalIntelligenceEnhancement | null> {
@@ -347,10 +409,11 @@ export class OpenAICompatibleProvider implements AIProvider {
 
     const user = [
       `Site: ${context.url} (title: "${context.title}").`,
-      `Data: ${JSON.stringify(digest)}`,
+      `Data: ${JSON.stringify(redactObject(digest, buildRedactor()))}`,
     ].join("\n");
 
-    return this.postJson("historical-intelligence", system, user, validateHistoricalIntelligenceEnhancement);
+    return this.postJson("historical-intelligence", system, user, raw =>
+      validateHistoricalIntelligenceEnhancement(raw) ?? (isEmptyEnvelope(raw, ["headline"]) ? NO_CHANGE : null));
   }
 }
 

@@ -395,3 +395,61 @@ test("triage validates strictly and falls back to deterministic on malformed out
     await server.close();
   }
 });
+
+test("a valid response with nothing to refine is not reported as a degraded stage", async () => {
+  const context = { url: "https://qa.test", title: "x", mode: "deterministic" as const, findings: [], flows: [], scenarios: [] };
+  for (const content of [{ findings: [], flows: [], scenarios: [] }, {}]) {
+    const server = await startServer(() => okCompletion(content));
+    try {
+      const provider = new OpenAICompatibleProvider("sk-TEST", `http://127.0.0.1:${server.port}/v1/chat/completions`, "test-model");
+      const out = await provider.enhance(context);
+      assert.equal(out, null);
+      assert.deepEqual(provider.failedStages(), [], `no-op ${JSON.stringify(content)} is not a failure`);
+      assert.deepEqual(provider.failedStageDetails(), []);
+    } finally {
+      await server.close();
+    }
+  }
+});
+
+test("malformed triage output is a schema failure; an empty verdict list is not", async () => {
+  const malformed = await startServer(() => okCompletion({ verdicts: "nope" }));
+  try {
+    const provider = new OpenAICompatibleProvider("sk-TEST", `http://127.0.0.1:${malformed.port}/v1/chat/completions`, "triage-model");
+    assert.equal(await provider.triageVerifications([verificationResult()], { url: "https://qa.test/en", title: "QA target" }), null);
+    assert.deepEqual(provider.failedStageDetails(), [{ stage: "triage", reason: "schema-invalid" }]);
+  } finally {
+    await malformed.close();
+  }
+
+  const empty = await startServer(() => okCompletion({ verdicts: [] }));
+  try {
+    const provider = new OpenAICompatibleProvider("sk-TEST", `http://127.0.0.1:${empty.port}/v1/chat/completions`, "triage-model");
+    assert.equal(await provider.triageVerifications([verificationResult()], { url: "https://qa.test/en", title: "QA target" }), null);
+    assert.deepEqual(provider.failedStages(), [], "an empty verdict list means the deterministic verdicts stand");
+  } finally {
+    await empty.close();
+  }
+});
+
+test("enhance redacts scanner text before sending the deterministic draft", async () => {
+  const captured: string[] = [];
+  const server = await startServer((_url, body) => {
+    captured.push(body);
+    return okCompletion({ summary: { headline: "ok" } });
+  });
+  try {
+    const provider = new OpenAICompatibleProvider("sk-TEST", `http://127.0.0.1:${server.port}/v1/chat/completions`, "test-model");
+    await provider.enhance({
+      url: "https://qa.test",
+      title: "x",
+      mode: "deterministic",
+      findings: [{ id: "QA-F-001", code: "x", severity: "HIGH", confidence: "high", count: 1, message: "password=hunter2-secret" }],
+      flows: [],
+      scenarios: [],
+    });
+    assert.ok(!captured.join("\n").includes("hunter2-secret"), "credentials in scanner text are redacted before the AI call");
+  } finally {
+    await server.close();
+  }
+});

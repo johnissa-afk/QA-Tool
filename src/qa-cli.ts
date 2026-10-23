@@ -53,6 +53,10 @@ import { atomicWriteText } from "./atomic-write.js";
 import { DashboardOptions, serveUntilClosed } from "./dashboard/server.js";
 import { MAX_CONCURRENT_RUNS_LIMIT } from "./dashboard/run-manager.js";
 
+// `.env` is documented as the local configuration source (README, .env.example)
+// and `src/cli.ts` loads it the same way. Without this call every QA_* / AI_* /
+// SMTP_* value in `.env` was silently ignored by `qa`, `dash`, and `serve`.
+dotenv.config({ path: resolve(process.cwd(), ".env"), quiet: true });
 
 
 export const DEFAULT_SPEC = "generated/generated-tests.spec.ts";
@@ -199,6 +203,14 @@ Configuration:
   historicalIntelligence.enabled, ci.failOn, ci.gateMinSeverity,
   baseline.maxAge, baseline.path. Unknown properties, invalid values, and malformed JSON are
   hard errors (the QA pipeline does not start).
+
+AI provider (optional):
+  AI_API_KEY           Enables bounded AI refinement of the deterministic draft.
+  AI_API_URL           OpenAI-compatible chat-completions endpoint
+                       (default: https://api.openai.com/v1/chat/completions).
+  AI_MODEL             Model name (default: gpt-4o-mini).
+                       Read from the environment or the project .env file; without
+                       AI_API_KEY every stage stays deterministic.
 
 Subcommand:
   serve|dash [--dir <dir>] [--history-dir <path>] [--port <n>] [--host <host>]
@@ -1050,8 +1062,19 @@ export async function main(): Promise<void> {
 
   // Surface degraded AI stages instead of silently emitting deterministic-only
   // output. A broken or expired key used to look identical to a clean run.
+  const detailSource = (provider as Partial<{ failedStageDetails: () => { stage: string; reason: string }[] }>).failedStageDetails;
   const degraded = (provider as Partial<{ failedStages: () => string[] }>).failedStages;
-  if (typeof degraded === "function") {
+  if (typeof detailSource === "function") {
+    const failed = detailSource.call(provider);
+    const connectivity = failed.filter(({ reason }) => reason === "http-error" || reason === "transport-error" || reason === "timeout");
+    const unusable = failed.filter(({ reason }) => !["http-error", "transport-error", "timeout"].includes(reason));
+    if (connectivity.length) {
+      console.warn(`AI provider: ${connectivity.length} stage(s) could not reach the endpoint (${connectivity.map(item => item.stage).join(", ")}). Results are deterministic-only; check AI_API_KEY/AI_API_URL/AI_MODEL and network access.`);
+    }
+    if (unusable.length) {
+      console.warn(`AI provider: ${unusable.length} stage(s) returned unusable JSON (${unusable.map(item => item.stage).join(", ")}). Deterministic results were kept.`);
+    }
+  } else if (typeof degraded === "function") {
     const failed = degraded.call(provider);
     if (failed.length) {
       console.warn(`AI provider: ${failed.length} stage(s) returned no enhancement (${failed.join(", ")}). Results are deterministic-only; check AI_API_KEY/AI_API_URL/AI_MODEL and network access.`);
