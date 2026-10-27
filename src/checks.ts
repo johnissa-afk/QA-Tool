@@ -9,11 +9,79 @@ const isDecorativeImage = (element: DiscoveredElement): boolean => {
   return element.alt !== null && element.alt.trim() === "";
 };
 
-export function detectIssues(elements: DiscoveredElement[], metadata: { title: string; lang: string | null; viewport: string | null }): Issue[] {
+/** Heading facts collected from the document outline (document order). */
+export type HeadingFact = { level: number; text: string };
+
+// Irregular (grandfathered) tags that do not match the regular langtag grammar.
+// Compared case-insensitively because BCP 47 tags are case-insensitive.
+const IRREGULAR_LANGUAGE_TAGS = new Set([
+  "en-gb-oed", "i-bnn", "i-default", "i-enochian", "i-hak", "i-lux", "i-mingo",
+  "i-navajo", "i-pwn", "i-tao", "i-tay", "i-tsu", "sgn-be-fr", "sgn-be-nl",
+  "sgn-ch-de", "art-lojban", "cel-gaulish", "no-bok", "no-nyn", "zh-guoyu",
+  "zh-hakka", "zh-min", "zh-min-nan", "zh-xiang",
+]);
+
+// Regular langtag grammar from RFC 5646 (language [script] [region] *variant
+// *extension [privateuse]), plus the privateuse-only form handled separately.
+const WELL_FORMED_LANGUAGE_TAG = /^(?:[A-Za-z]{2,3}(?:-[A-Za-z]{3}(?:-[A-Za-z]{3}){0,2})?|[A-Za-z]{4}|[A-Za-z]{5,8})(?:-[A-Za-z]{4})?(?:-(?:[A-Za-z]{2}|\d{3}))?(?:-(?:[A-Za-z0-9]{5,8}|\d[A-Za-z0-9]{3}))*(?:-(?:[0-9A-WY-Za-wy-z](?:-[A-Za-z0-9]{2,8})+|x(?:-[A-Za-z0-9]{2,8})+))*(?:-x(?:-[A-Za-z0-9]{2,8})+)?$/;
+
+/**
+ * Deterministic BCP 47 syntax check (RFC 5646 language-tag grammar plus the
+ * registered irregular tags). Syntax only: whether the subtag is a registered
+ * ISO 639 code is a registry question this checker deliberately does not guess.
+ */
+export const isWellFormedLanguageTag = (value: string): boolean => {
+  const tag = value.trim();
+  if (!tag || tag.length > 35) return false;
+  if (IRREGULAR_LANGUAGE_TAGS.has(tag.toLowerCase())) return true;
+  if (/^x(?:-[A-Za-z0-9]{1,8})+$/i.test(tag)) return true;
+  return WELL_FORMED_LANGUAGE_TAG.test(tag);
+};
+
+// Headings are collected as outline facts, not as report.elements, so their
+// evidence is an explicit snapshot locator (the "no element index" pattern).
+const headingSnapshot = (heading: HeadingFact): IssueElement => ({
+  tag: `h${heading.level}`,
+  role: "heading",
+  text: heading.text,
+  ariaLabel: null,
+  accessibleName: heading.text || null,
+  id: null,
+  testId: null,
+  type: null,
+  name: null,
+  placeholder: null,
+  href: null,
+  alt: null,
+  visible: true,
+  enabled: true,
+  recommendedLocator: heading.text
+    ? `page.getByRole("heading", { level: ${heading.level}, name: ${JSON.stringify(heading.text)} })`
+    : `page.getByRole("heading", { level: ${heading.level} })`,
+  locatorQuality: heading.text ? "high" : "low",
+});
+
+export function detectIssues(elements: DiscoveredElement[], metadata: { title: string; lang: string | null; viewport: string | null; headings?: HeadingFact[] }): Issue[] {
   const issues: Issue[] = [];
   if (!metadata.title.trim()) issues.push({ status: "WARNING", code: "missing-page-title", message: "The document has no page title." });
   if (!metadata.lang) issues.push({ status: "WARNING", code: "missing-lang", message: "The html element has no lang attribute." });
+  else if (!isWellFormedLanguageTag(metadata.lang)) issues.push({ status: "WARNING", code: "invalid-lang", message: `The html lang attribute value ${JSON.stringify(metadata.lang)} is not a well-formed BCP 47 language tag.` });
   if (!metadata.viewport) issues.push({ status: "WARNING", code: "missing-viewport", message: "No viewport meta tag was found." });
+  // Heading rules only run when the caller supplied outline facts; absent data
+  // is unknown, never a violation.
+  if (metadata.headings) {
+    const headings = metadata.headings;
+    if (!headings.some(heading => heading.level === 1)) {
+      issues.push({ status: "INFO", code: "missing-h1", message: "The document has no h1 heading." });
+    }
+    for (let index = 1; index < headings.length; index++) {
+      const previous = headings[index - 1];
+      const current = headings[index];
+      if (current.level > previous.level + 1) {
+        issues.push({ status: "WARNING", code: "heading-skipped-level", message: `An h${current.level} heading follows an h${previous.level} heading and skips h${previous.level + 1}.`, element: headingSnapshot(current) });
+      }
+    }
+  }
   const ids = new Map<string, DiscoveredElement[]>();
   for (const element of elements) {
     if (element.id) { const affected = ids.get(element.id) ?? []; affected.push(element); ids.set(element.id, affected); }

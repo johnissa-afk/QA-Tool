@@ -249,10 +249,14 @@ export async function scanPageInContext(context: BrowserContext, options: ScanOp
       page.evaluate(() => ({
         language: document.documentElement?.getAttribute("lang") ?? null,
         viewport: document.querySelector('meta[name="viewport"]')?.getAttribute("content") ?? null,
+        headings: Array.from(document.querySelectorAll("h1,h2,h3,h4,h5,h6")).map(node => ({
+          level: Number(node.tagName.substring(1)),
+          text: ((node as HTMLElement).textContent || "").trim().replace(/\s+/g, " ").slice(0, 120),
+        })),
       })),
     ]);
-    const { language, viewport } = metadata;
-    const issues = detectIssues(elements, { title, lang: language, viewport });
+    const { language, viewport, headings } = metadata;
+    const issues = detectIssues(elements, { title, lang: language, viewport, headings });
     const navigationStatus = response?.status();
     if (navigationStatus === 401) issues.push({ status: "FAIL", code: "authentication-failed", message: "Navigation returned HTTP 401. HTTP Basic Authentication was not accepted or is not configured." });
     else if (navigationStatus && navigationStatus >= 400) issues.push({ status: "FAIL", code: "page-http-error", message: `Page navigation returned HTTP ${navigationStatus}.` });

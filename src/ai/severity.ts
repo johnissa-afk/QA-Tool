@@ -182,6 +182,30 @@ export function classifyIssue(issue: Issue, ctx: SeverityContext): SeverityVerdi
         recommendation: "Set a lang attribute (e.g., lang=\"en\") on the html element.",
         userImpact: "Screen readers may mispronounce content and auto-translation may misbehave.",
       };
+    case "invalid-lang":
+      return {
+        severity: "LOW",
+        confidence: "high",
+        rationale: `${issue.message} The attribute is present, so the syntax itself is what assistive technology and translation tools reject.`,
+        recommendation: "Replace the value with a well-formed BCP 47 language tag (e.g., lang=\"en\" or lang=\"pt-BR\").",
+        userImpact: "Screen readers may fall back to a default pronunciation ruleset and language tooling may ignore the declaration.",
+      };
+    case "missing-h1":
+      return {
+        severity: "LOW",
+        confidence: "high",
+        rationale: `${issue.message} The document outline gives assistive technology and keyboard users no top-level entry point for the page content.`,
+        recommendation: "Add exactly one descriptive <h1> that states the primary topic of the page.",
+        userImpact: "Screen-reader users navigating by heading must explore the whole outline before understanding the page.",
+      };
+    case "heading-skipped-level":
+      return {
+        severity: "LOW",
+        confidence: "high",
+        rationale: `${issue.message} Heading levels are the outline assistive technology uses to jump between sections; a jump hides the intermediate structure.`,
+        recommendation: "Use consecutive heading levels in document order; do not skip from one level directly to a deeper one.",
+        userImpact: "Users navigating by heading may skip content or misread the page structure.",
+      };
     case "missing-viewport":
       return {
         severity: ctx.interactiveElementCount >= 5 ? "MEDIUM" : "LOW",
