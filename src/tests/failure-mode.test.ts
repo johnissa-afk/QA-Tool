@@ -76,6 +76,33 @@ const reportOf = (elements: DiscoveredElement[], links: LinkResult[] = []): Scan
 const cleanReport = (): ScanReport => reportOf([element()]);
 const highFindingReport = (): ScanReport => reportOf([element({ text: undefined, ariaLabel: null, name: null, accessibleName: null, recommendedLocator: "page.getByRole(\"button\", { name: \"?\" })" })]);
 
+/** A target that could not be classified: HTTP 404, `continueScan: false`, so
+ *  the normal QA scan never runs and the analysis carries a REVIEW_REQUIRED
+ *  access prerequisite. Same fixture shape as the CI-contract suite uses. */
+const accessReviewReport = (): ScanReport => ({
+  ...reportOf([]),
+  scan: { url: "https://404.qa.test/en", finalUrl: "https://404.qa.test/en", title: "404 Not Found", timestamp: new Date().toISOString(), durationMs: 1, navigationStatus: 404 },
+  access: {
+    url: "https://404.qa.test/en",
+    finalUrl: "https://404.qa.test/en",
+    httpStatus: 404,
+    accessStatus: "unknown",
+    authenticationType: "none",
+    challenge: null,
+    redirectDestination: null,
+    reason: "The target returned HTTP 404; access could not be classified.",
+    continueScan: false,
+    humanReview: true,
+  },
+  accessPrerequisite: {
+    type: "unknown",
+    status: "REVIEW_REQUIRED",
+    message: "Access prerequisite requires human review.",
+    httpStatus: 404,
+    challenge: null,
+  },
+});
+
 const writeReportFile = (dir: string, report: ScanReport, fileName = "report.json"): string => {
   const path = join(dir, fileName);
   writeFileSync(path, JSON.stringify(report, null, 2), "utf8");
@@ -135,6 +162,14 @@ const PURE_MATRIX: PureCase[] = [
   { name: "gate disabled + otherwise failing condition", input: done({ decision: { failed: true }, gate: { enabled: false, failed: true } }), category: "policy", exit: 1, continued: true, artifact: true },
   { name: "rotation fails (stale baseline in CI)", input: done({ rotationFailed: true }), category: "rotation", exit: 1, continued: true, artifact: true },
   { name: "rotation fresh", input: done({ rotationFailed: false }), category: "success", exit: 0, continued: true, artifact: true },
+  // Access prerequisite — the website was never tested, so this is a completed
+  // QA policy outcome (exit 1), not success and not a runtime fault (exit 2).
+  { name: "access REVIEW_REQUIRED (HTTP 404 / ambiguous) -> policy / 1", input: done({ accessPrerequisiteStatus: "REVIEW_REQUIRED" }), category: "policy", exit: 1, continued: true, artifact: true },
+  { name: "access BLOCKED -> policy / 1", input: done({ accessPrerequisiteStatus: "BLOCKED" }), category: "policy", exit: 1, continued: true, artifact: true },
+  { name: "access PASS never fails alone", input: done({ accessPrerequisiteStatus: "PASS" }), category: "success", exit: 0, continued: true, artifact: true },
+  { name: "access absent is unchanged", input: done({ accessPrerequisiteStatus: null }), category: "success", exit: 0, continued: true, artifact: true },
+  { name: "access review wins over a would-be gate (an untested run reports no regression)", input: done({ accessPrerequisiteStatus: "REVIEW_REQUIRED", gate: { enabled: true, failed: true } }), category: "policy", exit: 1, continued: true, artifact: true },
+  { name: "access blocked + status policy together", input: done({ accessPrerequisiteStatus: "BLOCKED", decision: { failed: true } }), category: "policy", exit: 1, continued: true, artifact: true },
   { name: "regression (gate) + policy together", input: done({ decision: { failed: true }, gate: { enabled: true, failed: true } }), category: "gate", exit: 1, continued: true, artifact: true },
   { name: "regression (gate) + rotation together", input: done({ gate: { enabled: true, failed: true }, rotationFailed: true }), category: "gate", exit: 1, continued: true, artifact: true },
   { name: "gate + rotation together", input: done({ gate: { enabled: true, failed: true }, rotationFailed: true }), category: "gate", exit: 1, continued: true, artifact: true },
@@ -148,6 +183,12 @@ const PURE_MATRIX: PureCase[] = [
   { name: "infrastructure failure is never masked by regression/gate/rotation", input: done({ infrastructureFailed: true, decision: { failed: true }, gate: { enabled: true, failed: true }, rotationFailed: true }), category: "infrastructure", exit: 2, continued: false, artifact: false },
   { name: "infrastructure failure beats configuration", input: done({ infrastructureFailed: true, configurationFailed: true }), category: "infrastructure", exit: 2, continued: false, artifact: false },
   { name: "infrastructure failure beats baseline", input: done({ infrastructureFailed: true, baselineVerificationFailed: true }), category: "infrastructure", exit: 2, continued: false, artifact: false },
+  // Exit 2 is preserved for the hard-failure paths even when an access
+  // prerequisite is also present: an untrusted run must never be reported as a
+  // completed QA verdict, and a completed verdict must never become exit 2.
+  { name: "baseline failure beats an access prerequisite", input: done({ baselineVerificationFailed: true, accessPrerequisiteStatus: "REVIEW_REQUIRED" }), category: "baseline-verification", exit: 2, continued: false, artifact: false },
+  { name: "infrastructure failure beats an access prerequisite", input: done({ infrastructureFailed: true, accessPrerequisiteStatus: "REVIEW_REQUIRED" }), category: "infrastructure", exit: 2, continued: false, artifact: false },
+  { name: "configuration failure (CI) beats an access prerequisite", input: done({ configurationFailed: true, ciMode: true, accessPrerequisiteStatus: "BLOCKED" }), category: "configuration", exit: 2, continued: false, artifact: false },
 ];
 
 test("pure matrix: every outcome classifies to the documented category and exit code", () => {
@@ -165,8 +206,10 @@ test("classifyRunOutcome agrees with decideCiContractExit on every completed-run
     for (const gateEnabled of [false, true]) {
       for (const gateFailed of [false, true]) {
         for (const rotationFailed of [false, true]) {
-          const input = { decision: { failed: decisionFailed }, gate: { enabled: gateEnabled, failed: gateFailed }, rotationFailed };
-          assert.equal(classifyRunOutcome(input).exitCode, decideCiContractExit(input));
+          for (const accessPrerequisiteStatus of [null, "PASS", "REVIEW_REQUIRED", "BLOCKED"] as const) {
+            const input = { decision: { failed: decisionFailed }, gate: { enabled: gateEnabled, failed: gateFailed }, rotationFailed, accessPrerequisiteStatus };
+            assert.equal(classifyRunOutcome(input).exitCode, decideCiContractExit(input), `access=${accessPrerequisiteStatus}`);
+          }
         }
       }
     }
@@ -174,29 +217,35 @@ test("classifyRunOutcome agrees with decideCiContractExit on every completed-run
 });
 
 test("no failure condition can accidentally return 0", () => {
-  // Exhaustive sweep over the completed-run flags x hard-failure flags x ciMode:
-  // whenever ANY failure signal is present the run can never classify as exit 0,
-  // and every verdict is internally consistent with the documented contract.
+  // Exhaustive sweep over the completed-run flags x hard-failure flags x ciMode
+  // x the access prerequisite: whenever ANY failure signal is present the run
+  // can never classify as exit 0, and every verdict is internally consistent
+  // with the documented contract. The access expectation is written out here
+  // rather than reusing the classifier's own predicate, so a bug in that
+  // predicate cannot hide itself.
   for (const decisionFailed of [false, true]) {
     for (const gateEnabled of [false, true]) {
       for (const gateFailed of [false, true]) {
         for (const rotationFailed of [false, true]) {
-          for (const configurationFailed of [false, true]) {
-            for (const baselineVerificationFailed of [false, true]) {
-              for (const infrastructureFailed of [false, true]) {
-                for (const ciMode of [false, true]) {
-                  const anyCompletedFailure = decisionFailed || (gateEnabled && gateFailed) || rotationFailed;
-                  const anyHardFailure = configurationFailed || baselineVerificationFailed || infrastructureFailed;
-                  const verdict = classifyRunOutcome({ decision: { failed: decisionFailed }, gate: { enabled: gateEnabled, failed: gateFailed }, rotationFailed, configurationFailed, baselineVerificationFailed, infrastructureFailed, ciMode });
-                  assert.equal(verdict.exitCode === 0, !anyCompletedFailure && !anyHardFailure, "only a fully clean state is exit 0");
-                  assert.equal(
-                    verdict.exitCode,
-                    verdict.category === "success" ? 0
-                      : verdict.category === "gate" || verdict.category === "policy" || verdict.category === "rotation" ? 1
-                        : verdict.category === "configuration" ? (ciMode ? 2 : 1)
-                          : 2,
-                    `category ${verdict.category} must map to its contract exit code`,
-                  );
+          for (const accessPrerequisiteStatus of [null, "PASS", "REVIEW_REQUIRED", "BLOCKED"] as const) {
+            for (const configurationFailed of [false, true]) {
+              for (const baselineVerificationFailed of [false, true]) {
+                for (const infrastructureFailed of [false, true]) {
+                  for (const ciMode of [false, true]) {
+                    const accessFailed = accessPrerequisiteStatus === "REVIEW_REQUIRED" || accessPrerequisiteStatus === "BLOCKED";
+                    const anyCompletedFailure = decisionFailed || (gateEnabled && gateFailed) || rotationFailed || accessFailed;
+                    const anyHardFailure = configurationFailed || baselineVerificationFailed || infrastructureFailed;
+                    const verdict = classifyRunOutcome({ decision: { failed: decisionFailed }, gate: { enabled: gateEnabled, failed: gateFailed }, rotationFailed, accessPrerequisiteStatus, configurationFailed, baselineVerificationFailed, infrastructureFailed, ciMode });
+                    assert.equal(verdict.exitCode === 0, !anyCompletedFailure && !anyHardFailure, `only a fully clean state is exit 0 (access=${accessPrerequisiteStatus})`);
+                    assert.equal(
+                      verdict.exitCode,
+                      verdict.category === "success" ? 0
+                        : verdict.category === "gate" || verdict.category === "policy" || verdict.category === "rotation" ? 1
+                          : verdict.category === "configuration" ? (ciMode ? 2 : 1)
+                            : 2,
+                      `category ${verdict.category} must map to its contract exit code`,
+                    );
+                  }
                 }
               }
             }
@@ -204,6 +253,45 @@ test("no failure condition can accidentally return 0", () => {
         }
       }
     }
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 1b. The access prerequisite in CI — the site was never tested.
+// ---------------------------------------------------------------------------
+
+test("an access prerequisite that prevented normal QA is exit 1, never 0 or 2", () => {
+  const clean = { decision: { failed: false }, gate: { enabled: false, failed: false }, rotationFailed: false };
+
+  // The two blocking states fail CI under EVERY --fail-on policy, because the
+  // verdict does not depend on status ranking: nothing was tested.
+  for (const status of ["REVIEW_REQUIRED", "BLOCKED"] as const) {
+    assert.equal(decideCiContractExit({ ...clean, accessPrerequisiteStatus: status }), CI_EXIT_POLICY_FAILURE, `${status} must fail CI with exit 1`);
+    assert.equal(classifyRunOutcome({ ...clean, accessPrerequisiteStatus: status }).category, "policy", `${status} reuses the existing policy category`);
+  }
+
+  // Non-blocking states keep the existing behavior.
+  assert.equal(decideCiContractExit({ ...clean, accessPrerequisiteStatus: "PASS" }), CI_EXIT_SUCCESS, "PASS is not a failure");
+  assert.equal(decideCiContractExit({ ...clean, accessPrerequisiteStatus: null }), CI_EXIT_SUCCESS, "an absent prerequisite is unchanged");
+  assert.equal(decideCiContractExit(clean), CI_EXIT_SUCCESS, "no access input is unchanged");
+
+  // A REVIEW-required run must fail CI even when every other policy is happy —
+  // this is the exact regression: --fail-on failed + QA status REVIEW used to
+  // report "CI: acceptable -> exit 0" for an untested website.
+  assert.equal(decideCiContractExit({ ...clean, decision: { failed: false }, accessPrerequisiteStatus: "REVIEW_REQUIRED" }), CI_EXIT_POLICY_FAILURE);
+
+  // Exit 2 stays with the hard-failure path: baseline integrity and runtime
+  // failures are never reclassified as a completed QA verdict, and an access
+  // prerequisite never escalates a completed run to exit 2.
+  assert.equal(classifyRunOutcome({ ...clean, accessPrerequisiteStatus: "REVIEW_REQUIRED", baselineVerificationFailed: true }).exitCode, CI_EXIT_INFRASTRUCTURE, "baseline integrity still wins");
+  assert.equal(classifyRunOutcome({ ...clean, accessPrerequisiteStatus: "BLOCKED", infrastructureFailed: true }).exitCode, CI_EXIT_INFRASTRUCTURE, "infrastructure still wins");
+  assert.equal(classifyRunOutcome({ ...clean, accessPrerequisiteStatus: "REVIEW_REQUIRED", configurationFailed: true, ciMode: true }).exitCode, CI_EXIT_INFRASTRUCTURE, "a CI config error still wins");
+
+  // The verdict is internally consistent: exit code and category always agree.
+  for (const status of ["REVIEW_REQUIRED", "BLOCKED"] as const) {
+    const verdict = classifyRunOutcome({ ...clean, accessPrerequisiteStatus: status });
+    assert.equal(verdict.exitCode, 1);
+    assert.ok(formatFailureModeLine(verdict.category, verdict.exitCode).includes(`exit ${verdict.exitCode}`), "the printed line matches the exit code");
   }
 });
 
@@ -515,6 +603,15 @@ const CLI_MATRIX: MatrixCase[] = [
     },
     args: (reportPath, baselinePath) => [...baseArgs(reportPath, "out.json"), "--baseline", baselinePath!, "--baseline-max-age", "1h", "--ci"],
     expectedExit: CI_EXIT_POLICY_FAILURE, categoryLine: line("gate", 1), continued: true, artifact: true,
+  },
+  {
+    // The access prerequisite is a COMPLETED run: it finishes the pipeline and
+    // writes its report, so it is exit 1 with `continued`/`artifact` true —
+    // never an abort-style exit 2.
+    name: "access prerequisite REVIEW_REQUIRED (HTTP 404) -> policy / 1, run still completes",
+    setup: (dir) => ({ reportPath: writeReportFile(dir, accessReviewReport(), "report-404.json"), baselinePath: null }),
+    args: (reportPath) => [...baseArgs(reportPath, "out.json"), "--ci"],
+    expectedExit: CI_EXIT_POLICY_FAILURE, categoryLine: line("policy", 1), continued: true, artifact: true,
   },
   {
     name: "infrastructure failure, not masked by regression flags -> infrastructure / 2",

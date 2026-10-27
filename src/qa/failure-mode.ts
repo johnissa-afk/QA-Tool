@@ -7,7 +7,8 @@
 // stack — it adds no pipeline, no policy engine, and no baseline system:
 //
 //   exit 0  = success                          (Phase 11A contract)
-//   exit 1  = policy / gate / rotation         (Phase 8C / 9 / 10D)
+//   exit 1  = policy / gate / rotation         (Phase 8C / 9 / 10D), plus an
+//             access prerequisite that prevented normal QA from running
 //   exit 2  = configuration / baseline-verification / infrastructure
 //             (the pre-existing hard-failure paths; never collapsed into 1)
 //
@@ -19,15 +20,27 @@
 // exit behavior (1 in a normal run, 2 in CI mode); every other hard failure is
 // 2 under the CI contract.
 //
+// An access prerequisite (REVIEW_REQUIRED / BLOCKED) is ALSO a policy outcome
+// and deliberately reuses the existing "policy" category rather than inventing
+// a new one: the website was not actually tested, which is a completed QA
+// verdict, not a runtime fault. It therefore cannot borrow the exit-2
+// infrastructure path (that would report an untrusted artifact instead of a
+// failing one), and it must never be reported as success.
+//
 // Precedence (deterministic, first match wins) — verified by the matrix tests:
 //   1. infrastructure          -> 2   a runtime failure is never masked
 //   2. configuration           -> 1 / 2 (CI)
 //   3. baseline-verification   -> 2   never converted into a gate/regression
-//   4. gate (enabled + failed) -> 1   the most specific regression signal
-//   5. policy (CI status)      -> 1
-//   6. rotation (stale)        -> 1
-//   7. success                 -> 0
+//   4. access prerequisite     -> 1   the run completed without testing the site,
+//                                     so this is the root cause; any gate or
+//                                     status verdict computed from an untested
+//                                     run must not replace it
+//   5. gate (enabled + failed) -> 1   the most specific regression signal
+//   6. policy (CI status)      -> 1
+//   7. rotation (stale)        -> 1
+//   8. success                 -> 0
 // ---------------------------------------------------------------------------
+import type { AccessPrerequisite } from "../types.js";
 import { CI_EXIT_INFRASTRUCTURE, CI_EXIT_POLICY_FAILURE, CI_EXIT_SUCCESS } from "./ci-policy.js";
 
 /** The stable failure categories. "policy" is the Phase 8C status decision;
@@ -63,6 +76,18 @@ export type RunOutcomeInput = {
   decision: { failed: boolean };
   gate: { enabled: boolean; failed: boolean };
   rotationFailed: boolean;
+  /** The access prerequisite the scan produced, when there is one.
+   *
+   *  `REVIEW_REQUIRED` (access could not be deterministically classified — e.g.
+   *  an HTTP 404, a login page, an opaque challenge) and `BLOCKED` both mean the
+   *  normal QA scan never ran, so the website was never actually tested. That is
+   *  a COMPLETED QA policy outcome: CI fails with exit 1, never exit 0.
+   *
+   *  `PASS`, `null`, or absent means access was fine and carries no exit effect.
+   *  The status is read as-is rather than derived from the QA overall status, so
+   *  the verdict does not depend on `--fail-on` (a REVIEW-required run must fail
+   *  CI under any policy). */
+  accessPrerequisiteStatus?: AccessPrerequisite["status"] | null;
   /** A configuration/usage error aborted the run before (or during) the pipeline. */
   configurationFailed?: boolean;
   /** Baseline loading/verification failed (missing/malformed/invalid/tampered). */
@@ -78,10 +103,18 @@ export type RunOutcomeInput = {
  *  catch path. Completed-run verdicts never throw. */
 export type ThrownFailureCategory = Extract<FailureModeCategory, "configuration" | "baseline-verification" | "infrastructure">;
 
+/** True when the run produced an access prerequisite that prevented normal QA
+ *  from running. Both blocking states are a completed QA policy outcome. */
+export function accessPolicyFails(status: AccessPrerequisite["status"] | null | undefined): boolean {
+  return status === "REVIEW_REQUIRED" || status === "BLOCKED";
+}
+
 /** Deterministic precedence order. First true condition wins, so a baseline
  *  verification failure is never converted into a gate/regression verdict, an
  *  infrastructure failure is never masked by a regression/gate/rotation result,
- *  and among the exit-1 conditions the gate is the most specific signal. */
+ *  an access prerequisite is never masked by a verdict computed from an
+ *  untested run, and among the remaining exit-1 conditions the gate is the most
+ *  specific signal. */
 export function classifyRunOutcome(input: RunOutcomeInput): FailureModeVerdict {
   const { decision, gate, rotationFailed } = input;
 
@@ -90,7 +123,10 @@ export function classifyRunOutcome(input: RunOutcomeInput): FailureModeVerdict {
   if (input.configurationFailed) return verdict("configuration", input.ciMode ? CI_EXIT_INFRASTRUCTURE : CI_EXIT_POLICY_FAILURE, false, false);
   if (input.baselineVerificationFailed) return verdict("baseline-verification", CI_EXIT_INFRASTRUCTURE, false, false);
 
-  // Completed-run policy failures — exit 1.
+  // Completed-run policy failures — exit 1. An access prerequisite comes first:
+  // when the site was never tested it explains the outcome, and this run DID
+  // complete and write its artifacts (continued/producedArtifact stay true).
+  if (accessPolicyFails(input.accessPrerequisiteStatus)) return verdict("policy", CI_EXIT_POLICY_FAILURE, true, true);
   if (gate.enabled && gate.failed) return verdict("gate", CI_EXIT_POLICY_FAILURE, true, true);
   if (decision.failed) return verdict("policy", CI_EXIT_POLICY_FAILURE, true, true);
   if (rotationFailed) return verdict("rotation", CI_EXIT_POLICY_FAILURE, true, true);

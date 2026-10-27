@@ -126,6 +126,29 @@ test("decideCiContractExit maps completed-run outcomes to 0/1 only", () => {
   assert.equal(decideCiContractExit({ ...ok, gate: { enabled: false, failed: false } }), CI_EXIT_SUCCESS, "an inactive gate never fails a run");
 });
 
+test("an access prerequisite that blocks normal QA fails CI with exit 1 (never 0)", () => {
+  const ok = { decision: { failed: false }, gate: { enabled: false, failed: false }, rotationFailed: false };
+
+  // The website was not tested — a completed QA policy outcome, exit 1.
+  assert.equal(decideCiContractExit({ ...ok, accessPrerequisiteStatus: "REVIEW_REQUIRED" }), CI_EXIT_POLICY_FAILURE,
+    "an ambiguous/inaccessible target (HTTP 404, login, challenge) must not be reported as acceptable");
+  assert.equal(decideCiContractExit({ ...ok, accessPrerequisiteStatus: "BLOCKED" }), CI_EXIT_POLICY_FAILURE,
+    "an access-denied target must not be reported as acceptable");
+
+  // Everything else is unchanged.
+  assert.equal(decideCiContractExit({ ...ok, accessPrerequisiteStatus: "PASS" }), CI_EXIT_SUCCESS, "PASS carries no failure");
+  assert.equal(decideCiContractExit({ ...ok, accessPrerequisiteStatus: null }), CI_EXIT_SUCCESS, "absent prerequisite is unchanged");
+  assert.equal(decideCiContractExit(ok), CI_EXIT_SUCCESS, "no access input is unchanged");
+
+  // The access verdict never depends on --fail-on: it fails even when the
+  // status policy is satisfied (QA status REVIEW under the default policy).
+  assert.equal(decideCiContractExit({ ...ok, decision: { failed: false }, accessPrerequisiteStatus: "REVIEW_REQUIRED" }), CI_EXIT_POLICY_FAILURE);
+
+  // The access verdict never converts into exit 2 — that stays reserved for
+  // baseline integrity and infrastructure, which are asserted end to end below.
+  assert.equal(decideCiContractExit({ ...ok, accessPrerequisiteStatus: "REVIEW_REQUIRED" }), CI_EXIT_POLICY_FAILURE);
+});
+
 // --- success path ------------------------------------------------------------
 
 test("valid verified baseline + clean QA run -> exit 0", () => {
@@ -175,6 +198,103 @@ test("valid baseline + NEW HIGH regression/gate violation -> exit 1", () => {
     assert.ok(stdout.includes("CI: policy or gate violation → exit 1"), stdout);
     assert.ok(!stdout.includes("not comparable"), "the regression comparison was real, not skipped");
     void cleanPath;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// --- access prerequisite: the website was not tested -----------------------
+
+/** A scan whose target could NOT be classified: HTTP 404, access status
+ *  `unknown`, `continueScan: false`, so the normal QA scan never runs and the
+ *  analysis carries a REVIEW_REQUIRED access prerequisite. This is the exact
+ *  shape the real CI run produced — and it used to report
+ *  `CI: acceptable → exit 0`. */
+const accessReviewReport = (): ScanReport => ({
+  ...reportOf([]),
+  scan: { url: "https://404.qa.test/en", finalUrl: "https://404.qa.test/en", title: "404 Not Found", timestamp: new Date().toISOString(), durationMs: 1, navigationStatus: 404 },
+  access: {
+    url: "https://404.qa.test/en",
+    finalUrl: "https://404.qa.test/en",
+    httpStatus: 404,
+    accessStatus: "unknown",
+    authenticationType: "none",
+    challenge: null,
+    redirectDestination: null,
+    reason: "The target returned HTTP 404; access could not be classified.",
+    continueScan: false,
+    humanReview: true,
+  },
+  accessPrerequisite: {
+    type: "unknown",
+    status: "REVIEW_REQUIRED",
+    message: "Access prerequisite requires human review.",
+    httpStatus: 404,
+    challenge: null,
+  },
+});
+
+/** An access-denied target: the scan stops and the prerequisite is BLOCKED. */
+const accessBlockedReport = (): ScanReport => {
+  const base = accessReviewReport();
+  return {
+    ...base,
+    scan: { ...base.scan, title: "403 Forbidden", navigationStatus: 403 },
+    access: { ...(base.access as NonNullable<ScanReport["access"]>), httpStatus: 403, accessStatus: "access-blocked", reason: "The target denied access (HTTP 403)." },
+    accessPrerequisite: { type: "access-blocked", status: "BLOCKED", message: "Access prerequisite requires human review.", httpStatus: 403, challenge: null },
+  };
+};
+
+test("HTTP 404 / access cannot be classified -> REVIEW_REQUIRED -> normal QA never runs -> CI exit 1, not 0", () => {
+  const dir = tempDir();
+  try {
+    const reportPath = writeReportFile(dir, accessReviewReport(), "report-404.json");
+    const { status, stdout, stderr } = runCli([...baseArgs(dir, reportPath, "out.json"), "--ci"], dir);
+    assert.equal(status, CI_EXIT_POLICY_FAILURE, `CI must exit 1 for an untested website\n${stdout}\n${stderr}`);
+
+    // The real scenario: the website was not actually tested.
+    assert.ok(stdout.includes("QA status: REVIEW"), stdout);
+    assert.ok(stdout.includes("access prerequisite requires human review"), stdout);
+    assert.ok(stdout.includes("Normal QA scan: not run"), "the safety boundary still prevented normal QA");
+    assert.ok(stdout.includes("status: REVIEW_REQUIRED"), stdout);
+
+    // CI must report a policy failure — and must NOT report a clean exit.
+    assert.ok(stdout.includes("CI: policy or gate violation → exit 1"), stdout);
+    assert.ok(stdout.includes("CI: access prerequisite REVIEW_REQUIRED → normal QA did not run → exit 1 (the website was not tested)"),
+      `the CI log must name the access reason for the exit 1\n${stdout}`);
+    assert.ok(!stdout.includes("CI: acceptable → exit 0"),
+      "CI must never report an untested website as acceptable");
+    assert.ok(stdout.includes("Failure mode: policy → exit 1."),
+      `the failure-mode line must agree with the exit code\n${stdout}`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("an access-denied target (BLOCKED) also exits 1 and never reports acceptable", () => {
+  const dir = tempDir();
+  try {
+    const reportPath = writeReportFile(dir, accessBlockedReport(), "report-403.json");
+    const { status, stdout, stderr } = runCli([...baseArgs(dir, reportPath, "out.json"), "--ci"], dir);
+    assert.equal(status, CI_EXIT_POLICY_FAILURE, `CI must exit 1\n${stdout}\n${stderr}`);
+    assert.ok(stdout.includes("status: BLOCKED"), stdout);
+    assert.ok(stdout.includes("CI: access prerequisite BLOCKED → normal QA did not run → exit 1 (the website was not tested)"), stdout);
+    assert.ok(!stdout.includes("CI: acceptable → exit 0"), stdout);
+    assert.ok(stdout.includes("Failure mode: policy → exit 1."), stdout);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a normal local run still just shows REVIEW for the same untested target (no CI-style failure)", () => {
+  const dir = tempDir();
+  try {
+    const reportPath = writeReportFile(dir, accessReviewReport(), "report-404.json");
+    const { status, stdout } = runCli([...baseArgs(dir, reportPath, "out.json")], dir);
+    assert.equal(status, CI_EXIT_SUCCESS, "without --ci an access prerequisite is not a process failure");
+    assert.ok(stdout.includes("QA status: REVIEW"), "the local run still displays REVIEW");
+    assert.ok(!stdout.includes("CI:"), "no CI verdict is printed outside --ci");
+    assert.ok(!stdout.includes("Failure mode:"), "no failure-mode line outside --ci");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
