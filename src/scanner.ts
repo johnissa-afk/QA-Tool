@@ -79,7 +79,13 @@ async function mapConcurrent<T, R>(items: T[], concurrency: number, action: (ite
 }
 
 async function collectElements(page: Page): Promise<RawElement[]> {
-  return page.locator("button,a,input,textarea,select,img,form,nav,[role=dialog],video,audio").evaluateAll(nodes => nodes.map(node => {
+  return page.locator("button,a,input,textarea,select,img,form,nav,[role=dialog],video,audio").evaluateAll(nodes => {
+    // IMPORTANT: this callback is serialized and run inside the page. Do not declare named inner
+    // functions here (const f = () => ..., function f() {}): tsx/esbuild wraps them in a __name()
+    // helper that does not exist in the page, which breaks every scan under `npm run qa`.
+    const MEANINGFUL = /[\p{L}\p{N}]/u;
+    const NAMED_BY_CONTENT_ROLES = ["link", "button", "menuitem", "tab", "option", "checkbox", "radio", "switch"];
+    return nodes.map(node => {
     const element = node as HTMLElement;
     const input = node as HTMLInputElement;
     const style = getComputedStyle(element);
@@ -96,10 +102,57 @@ async function collectElements(page: Page): Promise<RawElement[]> {
     const label = element.id ? document.querySelector(`label[for="${CSS.escape(element.id)}"]`)?.textContent?.trim() : "";
     const text = (element.innerText || element.textContent || "").trim().replace(/\s+/g, " ").slice(0, 200);
     const ariaLabel = element.getAttribute("aria-label");
-    const accessibleName = ariaLabel || labelled || label || (tag === "img" ? (element as HTMLImageElement).alt : "") || text || element.getAttribute("title") || null;
+    // Name from content (simplified accname step 2F). A link or button is named not only by its own
+    // attributes and text but by what it contains: an image's alt text, an icon's <title> or
+    // aria-label, a child's aria-label. Logo links, poster cards and icon buttons are named this
+    // way, and reading only the element's own text reported them as nameless. Hidden children
+    // (display:none, visibility:hidden, aria-hidden) never contribute, and a name with no letter or
+    // digit (alt=".", "-", "|") carries no information, so it does not count.
+    let fromContent = "";
+    if (!ariaLabel && !labelled && !label && !text && (tag === "a" || tag === "button" || NAMED_BY_CONTENT_ROLES.includes(element.getAttribute("role") ?? ""))) {
+      const pending: Element[] = Array.from(element.children).reverse();
+      const parts: string[] = [];
+      while (pending.length > 0) {
+        const child = pending.pop() as Element;
+        const childStyle = getComputedStyle(child);
+        if (childStyle.display === "none" || childStyle.visibility === "hidden" || child.getAttribute("aria-hidden") === "true") continue;
+        const childTag = child.tagName.toLowerCase();
+        const candidates: Array<string | null> = [child.getAttribute("aria-label")];
+        let leaf = false;
+        if (childTag === "img" || (childTag === "input" && (child as HTMLInputElement).type === "image")) {
+          const alt = child.getAttribute("alt");
+          candidates.push(alt, alt === null ? child.getAttribute("title") : null, alt === null && childTag === "input" ? child.getAttribute("value") : null);
+          leaf = true;
+        } else if (childTag === "svg") {
+          candidates.push(child.querySelector("title")?.textContent ?? null);
+          leaf = true;
+        }
+        let found = "";
+        for (const candidate of candidates) {
+          const trimmed = (candidate ?? "").replace(/\s+/g, " ").trim();
+          if (MEANINGFUL.test(trimmed)) { found = trimmed; break; }
+        }
+        if (found) { parts.push(found); continue; }
+        if (!leaf) for (const grandchild of Array.from(child.children).reverse()) pending.push(grandchild);
+      }
+      fromContent = parts.join(" ");
+    }
+    // A form control inside a <label> is named by that label's text (the control itself, and any
+    // other controls in the label, are not part of the name). Only label[for] was recognised before.
+    let wrappingLabel = "";
+    if ((tag === "input" || tag === "select" || tag === "textarea") && !ariaLabel && !labelled && !label) {
+      const wrapper = element.closest("label");
+      if (wrapper) {
+        const clone = wrapper.cloneNode(true) as HTMLElement;
+        for (const control of Array.from(clone.querySelectorAll("input,select,textarea,button"))) control.remove();
+        wrappingLabel = (clone.textContent ?? "").replace(/\s+/g, " ").trim();
+      }
+    }
+    const accessibleName = ariaLabel || labelled || label || wrappingLabel || (tag === "img" ? (element as HTMLImageElement).alt : "") || text || fromContent || element.getAttribute("title") || null;
     const interactive = ["button", "a", "input", "textarea", "select"].includes(tag) || ["button", "link", "checkbox", "radio", "textbox", "combobox", "searchbox"].includes(role ?? "");
     return { tag, role, text, ariaLabel, placeholder: input.placeholder || null, name: input.name || element.getAttribute("name"), id: element.id || null, testId: element.getAttribute("data-testid"), type, hasExplicitType: tag !== "input" || element.hasAttribute("type"), autocomplete: element.getAttribute("autocomplete"), href: tag === "a" ? (node as HTMLAnchorElement).href || null : null, alt: tag === "img" ? (node as HTMLImageElement).getAttribute("alt") : null, visible: style.display !== "none" && style.visibility !== "hidden" && box.width > 0 && box.height > 0, enabled: !(input.disabled || element.getAttribute("aria-disabled") === "true"), boundingBox: box.width || box.height ? { x: box.x, y: box.y, width: box.width, height: box.height } : null, interactive, accessibleName, formIndex };
-  }));
+    });
+  });
 }
 
 type NavigationResult = { response: Response | null; retryAttempts: number };
