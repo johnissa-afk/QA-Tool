@@ -1,0 +1,623 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>QA Analysis — Example Domain</title>
+<style>
+:root{color-scheme:light}body{font:14px system-ui,sans-serif;margin:0;background:#f7f9fc;color:#17212b;line-height:1.45}main{max-width:1440px;margin:auto;padding:2rem}h1{margin:0}h2{margin:2.2rem 0 .7rem}section,.overview{background:#fff;border:1px solid #d7dee8;border-radius:10px;padding:1.2rem;margin-top:1rem}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.75rem}.card{background:#fff;border:1px solid #d7dee8;border-radius:8px;padding:.85rem;margin-top:.6rem}.card strong{font-size:1.2rem;display:block}.headline{font-size:1.05rem;font-weight:600}.sub{color:#64748b;font-size:.85rem;margin-top:.15rem}.chips{color:#475569;font-size:.82rem;margin-top:.35rem}.chips.warn{background:#fef3c7;border-radius:6px;padding:.35rem .5rem}.fail{color:#b42318}.warning{color:#9a6700}.info{color:#175cd3}.pass{color:#067647}.num{text-align:right;font-variant-numeric:tabular-nums}.empty{color:#94a3b8;font-style:italic;padding:.4rem 0}.q{font-weight:600}.ev{margin:.2rem 0;padding-left:1.1rem;font-size:.82rem}.flow-el{font-size:.82rem;color:#475569}.badge{font-weight:700;font-size:.72rem;padding:.12rem .45rem;border-radius:99px;white-space:nowrap;display:inline-block;margin:.05rem}.badge-critical,.badge-fail,.badge-status-fail{background:#fde8e8;color:#b42318}.badge-high,.badge-status-review{background:#fef3c7;color:#9a6700}.badge-medium{background:#fff4e5;color:#b54708}.badge-low,.badge-info{background:#eef2f7;color:#475569}.badge-status-pass{background:#e6f4ea;color:#067647}.badge-status-not-tested{background:#eef2f7;color:#475569}.badge-status-blocked{background:#fde8e8;color:#b42318}.badge-conf-high{background:#e6f4ea;color:#067647}.badge-conf-medium{background:#fef3c7;color:#9a6700}.badge-conf-low{background:#fde8e8;color:#b42318}.badge-auto{background:#e0edff;color:#175cd3}.badge-manual{background:#f1f5f9;color:#475569}.badge-safe{background:#e6f4ea;color:#067647}.badge-review{background:#fef3c7;color:#9a6700}.badge-high-risk{background:#fde8e8;color:#b42318}.badge-blocked{background:#f8fafc;color:#0f172a;border:1px solid #94a3b8}.badge-flow{background:#ede9fe;color:#6d28d9}.badge-state{background:#e2e8f0;color:#334155}.badge-intent{background:#e0edff;color:#175cd3}.badge-prio{background:#f1f5f9;color:#475569}.badge-risk.safe{background:#e6f4ea;color:#067647}.badge-risk.review{background:#fef3c7;color:#9a6700}.badge-risk.high-risk{background:#fde8e8;color:#b42318}.finding-head{display:flex;flex-wrap:wrap;gap:.3rem;align-items:center}table{border-collapse:collapse;width:100%;background:#fff}td,th{padding:.6rem;border:1px solid #d7dee8;text-align:left;vertical-align:top;word-break:break-word}th{background:#f1f5f9}code{white-space:pre-wrap;font-size:.85em}.finding{font-size:.85rem}.finding .q{font-size:.9rem}.finding .heading{font-size:1rem}.fix ul{margin:.3rem 0;padding-left:1.2rem}ol,ul{margin:.15rem 0}
+</style></head><body><main>
+
+<h1>QA Analysis</h1>
+<section class="overview">
+  <h2>Executive Summary</h2>
+  <p class="headline"><span class="badge badge-status-not_tested">NOT_TESTED</span> QA (deterministic): no verification run performed for https://example.com — 1 interactive elements scanned.</p>
+  <p class="sub">Analyzed by <code>deterministic</code> in deterministic mode on 2026-10-07T10:44:01.849Z.</p>
+  <div class="grid"><div class="card"><strong>1</strong>Elements</div><div class="card"><strong>1</strong>Interactive</div><div class="card"><strong>0</strong>Findings</div><div class="card"><strong>1</strong>Flows</div><div class="card"><strong>1</strong>Intent scenarios</div><div class="card"><strong>3</strong>Automated</div><div class="card"><strong>1</strong>Review</div><div class="card"><strong>1</strong>Manual</div><div class="card"><strong>0</strong>Broken links</div><div class="card"><strong>0</strong>Verified</div><div class="card"><strong>0</strong>Executed</div><div class="card"><strong>0</strong>Reproduced</div><div class="card"><strong>0</strong>Not reproduced</div><div class="card"><strong>0</strong>Passed checks</div><div class="card"><strong>0</strong>Review needed</div><div class="card"><strong>0</strong>Scheduled</div><div class="card"><strong>0</strong>Skipped</div><div class="card"><strong>0</strong>Infrastructure</div><div class="card"><strong>0</strong>Unverified</div><div class="card"><strong>1</strong>Manual flows</div><div class="card"><strong>0</strong>Flow discovery</div><div class="card"><strong>0</strong>Flows executed</div><div class="card"><strong>3</strong>Coverage actions</div><div class="card"><strong>0</strong>Pages tested</div><div class="card"><strong>0</strong>Root-cause candidates</div><div class="card"><strong>0</strong>Investigation queue</div></div>
+  
+</section>
+
+
+
+<section>
+  <h2>QA Intelligence</h2>
+  <p class="sub">Phase 6: evidence relationships → related-finding groups → root-cause CANDIDATES → investigation queue. Grouping is semantic only (same normalized element identity on the same page); nothing is grouped by category, severity, URL text, or shared words. Every candidate is a hypothesis, never a confirmed cause.</p>
+  <div class="chips"></div>
+  <div class="empty">No root-cause candidates — the evidence does not support clustering any signals yet.</div>
+  
+  
+  
+  
+</section>
+
+<section>
+  <h2>QA History</h2>
+  <p class="headline">Phase 7A: persisted QA run history for this site.</p>
+  <div class="chips">Status: <span class="badge badge-status-pass">AVAILABLE</span> · schema v1 · <span class="q">2</span> run(s) stored</div>
+  <table><tbody>
+    <tr><th>Site identity</th><td><code>https://example.com|https://example.com/|14371ecc0e16d7614c51c8072abf3fbe0ada42c5</code></td></tr>
+    <tr><th>Current run</th><td><code>2026-10-07T10-44-02-052Z-04cafba8</code></td></tr>
+    <tr><th>History directory</th><td><code>C:\Users\User\PlaywrightProjects\AI-Website-QA\reports\history</code></td></tr>
+    <tr><th>Note</th><td class="sub">This run was persisted to the QA run history.</td></tr>
+  </tbody></table>
+  <p class="sub">Full run artifacts live in the history directory; the JSON report carries this pointer only. Cross-run interpretation (lifecycle trends, flow stability, investigation queue) is rendered in the Historical Intelligence section below.</p>
+</section>
+
+<section>
+  <h2>Historical Intelligence</h2>
+  <p class="headline">Phase 7B: deterministic, confidence-aware interpretation of the persisted QA runs for this site.</p>
+  <div class="chips">Status: <span class="badge badge-status-pass">AVAILABLE</span> · schema v1 · <span class="q">2</span> ordered run(s) analyzed</div>
+<p class="sub">Window: 2026-09-29T06:50:03.348Z → 2026-10-07T10:44:02.075Z.</p>
+<table class="summary-cards"><tbody><tr>
+    <td class="card"><span class="card-value">0</span><span class="card-label">findings tracked</span></td>
+    <td class="card"><span class="card-value">0</span><span class="card-label">new</span></td>
+    <td class="card"><span class="card-value">0</span><span class="card-label">persisting</span></td>
+    <td class="card"><span class="card-value">0</span><span class="card-label">disappeared</span></td>
+    <td class="card"><span class="card-value">0</span><span class="card-label">reappeared</span></td>
+    <td class="card"><span class="card-value">0</span><span class="card-label">recurring</span></td>
+    <td class="card"><span class="card-value">0</span><span class="card-label">intermittent</span></td>
+    <td class="card"><span class="card-value">0</span><span class="card-label">review required</span></td>
+  </tr></tbody></table>
+<h3>Investigation queue (15)</h3><table><thead><tr><th>ID</th><th>Priority</th><th>Kind</th><th>Title</th><th>Runs</th><th>Confidence</th><th>Reason</th></tr></thead><tbody><tr>
+      <td><code>HIQ-001</code></td>
+      <td>P3</td>
+      <td>PERSISTENT_COVERAGE_GAP</td>
+      <td><span class="q">Link integrity</span></td>
+      <td class="sub"><code>2026-09-29T06-50-03-348Z-fef851b7</code> <code>2026-10-07T10-44-02-052Z-04cafba8</code></td>
+      <td><span class="badge badge-conf-medium">MEDIUM</span></td>
+      <td class="sub">Priority P3: reproduced in multiple runs.</td>
+    </tr><tr>
+      <td><code>HIQ-002</code></td>
+      <td>P3</td>
+      <td>PERSISTENT_COVERAGE_GAP</td>
+      <td><span class="q">Forms</span></td>
+      <td class="sub"><code>2026-09-29T06-50-03-348Z-fef851b7</code> <code>2026-10-07T10-44-02-052Z-04cafba8</code></td>
+      <td><span class="badge badge-conf-medium">MEDIUM</span></td>
+      <td class="sub">Priority P3: reproduced in multiple runs.</td>
+    </tr><tr>
+      <td><code>HIQ-003</code></td>
+      <td>P3</td>
+      <td>PERSISTENT_COVERAGE_GAP</td>
+      <td><span class="q">Buttons</span></td>
+      <td class="sub"><code>2026-09-29T06-50-03-348Z-fef851b7</code> <code>2026-10-07T10-44-02-052Z-04cafba8</code></td>
+      <td><span class="badge badge-conf-medium">MEDIUM</span></td>
+      <td class="sub">Priority P3: reproduced in multiple runs.</td>
+    </tr><tr>
+      <td><code>HIQ-004</code></td>
+      <td>P3</td>
+      <td>PERSISTENT_COVERAGE_GAP</td>
+      <td><span class="q">Checkboxes</span></td>
+      <td class="sub"><code>2026-09-29T06-50-03-348Z-fef851b7</code> <code>2026-10-07T10-44-02-052Z-04cafba8</code></td>
+      <td><span class="badge badge-conf-medium">MEDIUM</span></td>
+      <td class="sub">Priority P3: reproduced in multiple runs.</td>
+    </tr><tr>
+      <td><code>HIQ-005</code></td>
+      <td>P3</td>
+      <td>PERSISTENT_COVERAGE_GAP</td>
+      <td><span class="q">Inputs</span></td>
+      <td class="sub"><code>2026-09-29T06-50-03-348Z-fef851b7</code> <code>2026-10-07T10-44-02-052Z-04cafba8</code></td>
+      <td><span class="badge badge-conf-medium">MEDIUM</span></td>
+      <td class="sub">Priority P3: reproduced in multiple runs.</td>
+    </tr><tr>
+      <td><code>HIQ-006</code></td>
+      <td>P3</td>
+      <td>PERSISTENT_COVERAGE_GAP</td>
+      <td><span class="q">Language controls</span></td>
+      <td class="sub"><code>2026-09-29T06-50-03-348Z-fef851b7</code> <code>2026-10-07T10-44-02-052Z-04cafba8</code></td>
+      <td><span class="badge badge-conf-medium">MEDIUM</span></td>
+      <td class="sub">Priority P3: reproduced in multiple runs.</td>
+    </tr><tr>
+      <td><code>HIQ-007</code></td>
+      <td>P3</td>
+      <td>PERSISTENT_COVERAGE_GAP</td>
+      <td><span class="q">Media controls</span></td>
+      <td class="sub"><code>2026-09-29T06-50-03-348Z-fef851b7</code> <code>2026-10-07T10-44-02-052Z-04cafba8</code></td>
+      <td><span class="badge badge-conf-medium">MEDIUM</span></td>
+      <td class="sub">Priority P3: reproduced in multiple runs.</td>
+    </tr><tr>
+      <td><code>HIQ-008</code></td>
+      <td>P3</td>
+      <td>PERSISTENT_COVERAGE_GAP</td>
+      <td><span class="q">Navigation controls</span></td>
+      <td class="sub"><code>2026-09-29T06-50-03-348Z-fef851b7</code> <code>2026-10-07T10-44-02-052Z-04cafba8</code></td>
+      <td><span class="badge badge-conf-medium">MEDIUM</span></td>
+      <td class="sub">Priority P3: reproduced in multiple runs.</td>
+    </tr><tr>
+      <td><code>HIQ-009</code></td>
+      <td>P3</td>
+      <td>PERSISTENT_COVERAGE_GAP</td>
+      <td><span class="q">Radio buttons</span></td>
+      <td class="sub"><code>2026-09-29T06-50-03-348Z-fef851b7</code> <code>2026-10-07T10-44-02-052Z-04cafba8</code></td>
+      <td><span class="badge badge-conf-medium">MEDIUM</span></td>
+      <td class="sub">Priority P3: reproduced in multiple runs.</td>
+    </tr><tr>
+      <td><code>HIQ-010</code></td>
+      <td>P3</td>
+      <td>PERSISTENT_COVERAGE_GAP</td>
+      <td><span class="q">Selects</span></td>
+      <td class="sub"><code>2026-09-29T06-50-03-348Z-fef851b7</code> <code>2026-10-07T10-44-02-052Z-04cafba8</code></td>
+      <td><span class="badge badge-conf-medium">MEDIUM</span></td>
+      <td class="sub">Priority P3: reproduced in multiple runs.</td>
+    </tr><tr>
+      <td><code>HIQ-011</code></td>
+      <td>P3</td>
+      <td>PERSISTENT_COVERAGE_GAP</td>
+      <td><span class="q">Language switching</span></td>
+      <td class="sub"><code>2026-09-29T06-50-03-348Z-fef851b7</code> <code>2026-10-07T10-44-02-052Z-04cafba8</code></td>
+      <td><span class="badge badge-conf-medium">MEDIUM</span></td>
+      <td class="sub">Priority P3: reproduced in multiple runs.</td>
+    </tr><tr>
+      <td><code>HIQ-012</code></td>
+      <td>P3</td>
+      <td>PERSISTENT_COVERAGE_GAP</td>
+      <td><span class="q">Media playback</span></td>
+      <td class="sub"><code>2026-09-29T06-50-03-348Z-fef851b7</code> <code>2026-10-07T10-44-02-052Z-04cafba8</code></td>
+      <td><span class="badge badge-conf-medium">MEDIUM</span></td>
+      <td class="sub">Priority P3: reproduced in multiple runs.</td>
+    </tr><tr>
+      <td><code>HIQ-013</code></td>
+      <td>P3</td>
+      <td>PERSISTENT_COVERAGE_GAP</td>
+      <td><span class="q">Page coverage — Example Domain</span></td>
+      <td class="sub"><code>2026-09-29T06-50-03-348Z-fef851b7</code> <code>2026-10-07T10-44-02-052Z-04cafba8</code></td>
+      <td><span class="badge badge-conf-medium">MEDIUM</span></td>
+      <td class="sub">Priority P3: reproduced in multiple runs.</td>
+    </tr><tr>
+      <td><code>HIQ-014</code></td>
+      <td>P3</td>
+      <td>PERSISTENT_COVERAGE_GAP</td>
+      <td><span class="q">Responsive layout</span></td>
+      <td class="sub"><code>2026-09-29T06-50-03-348Z-fef851b7</code> <code>2026-10-07T10-44-02-052Z-04cafba8</code></td>
+      <td><span class="badge badge-conf-medium">MEDIUM</span></td>
+      <td class="sub">Priority P3: reproduced in multiple runs.</td>
+    </tr><tr>
+      <td><code>HIQ-015</code></td>
+      <td>P3</td>
+      <td>PERSISTENT_COVERAGE_GAP</td>
+      <td><span class="q">Site search</span></td>
+      <td class="sub"><code>2026-09-29T06-50-03-348Z-fef851b7</code> <code>2026-10-07T10-44-02-052Z-04cafba8</code></td>
+      <td><span class="badge badge-conf-medium">MEDIUM</span></td>
+      <td class="sub">Priority P3: reproduced in multiple runs.</td>
+    </tr></tbody></table>
+<h3>Coverage trends (18)</h3><table><thead><tr><th>Semantic key</th><th>Coverage item</th><th>Trend</th><th>Confidence</th><th>Latest status</th></tr></thead><tbody><tr>
+      <td><code>ERROR_HANDLING|https://example.com/|link integrity</code></td>
+      <td>Link integrity</td>
+      <td><span class="badge badge-status-fail">PERSISTENTLY_UNTESTED</span></td>
+      <td><span class="badge badge-conf-medium">MEDIUM</span></td>
+      <td>NOT_TESTED</td>
+    </tr><tr>
+      <td><code>ERROR_HANDLING|https://example.com/|start page navigation</code></td>
+      <td>Start page navigation</td>
+      <td><span class="badge badge-state">COVERAGE_STABLE</span></td>
+      <td><span class="badge badge-conf-medium">MEDIUM</span></td>
+      <td>TESTED</td>
+    </tr><tr>
+      <td><code>ERROR_HANDLING|https://example.com/|uncaught page / console errors</code></td>
+      <td>Uncaught page / console errors</td>
+      <td><span class="badge badge-state">COVERAGE_STABLE</span></td>
+      <td><span class="badge badge-conf-medium">MEDIUM</span></td>
+      <td>TESTED</td>
+    </tr><tr>
+      <td><code>FORM|https://example.com/|forms</code></td>
+      <td>Forms</td>
+      <td><span class="badge badge-status-fail">PERSISTENTLY_UNTESTED</span></td>
+      <td><span class="badge badge-conf-medium">MEDIUM</span></td>
+      <td>NOT_APPLICABLE</td>
+    </tr><tr>
+      <td><code>INTERACTION|https://example.com/|buttons</code></td>
+      <td>Buttons</td>
+      <td><span class="badge badge-status-fail">PERSISTENTLY_UNTESTED</span></td>
+      <td><span class="badge badge-conf-medium">MEDIUM</span></td>
+      <td>NOT_APPLICABLE</td>
+    </tr><tr>
+      <td><code>INTERACTION|https://example.com/|checkboxes</code></td>
+      <td>Checkboxes</td>
+      <td><span class="badge badge-status-fail">PERSISTENTLY_UNTESTED</span></td>
+      <td><span class="badge badge-conf-medium">MEDIUM</span></td>
+      <td>NOT_APPLICABLE</td>
+    </tr><tr>
+      <td><code>INTERACTION|https://example.com/|inputs</code></td>
+      <td>Inputs</td>
+      <td><span class="badge badge-status-fail">PERSISTENTLY_UNTESTED</span></td>
+      <td><span class="badge badge-conf-medium">MEDIUM</span></td>
+      <td>NOT_APPLICABLE</td>
+    </tr><tr>
+      <td><code>INTERACTION|https://example.com/|language controls</code></td>
+      <td>Language controls</td>
+      <td><span class="badge badge-status-fail">PERSISTENTLY_UNTESTED</span></td>
+      <td><span class="badge badge-conf-medium">MEDIUM</span></td>
+      <td>NOT_APPLICABLE</td>
+    </tr><tr>
+      <td><code>INTERACTION|https://example.com/|links</code></td>
+      <td>Links</td>
+      <td><span class="badge badge-state">COVERAGE_STABLE</span></td>
+      <td><span class="badge badge-conf-medium">MEDIUM</span></td>
+      <td>TESTED</td>
+    </tr><tr>
+      <td><code>INTERACTION|https://example.com/|media controls</code></td>
+      <td>Media controls</td>
+      <td><span class="badge badge-status-fail">PERSISTENTLY_UNTESTED</span></td>
+      <td><span class="badge badge-conf-medium">MEDIUM</span></td>
+      <td>NOT_APPLICABLE</td>
+    </tr><tr>
+      <td><code>INTERACTION|https://example.com/|navigation controls</code></td>
+      <td>Navigation controls</td>
+      <td><span class="badge badge-status-fail">PERSISTENTLY_UNTESTED</span></td>
+      <td><span class="badge badge-conf-medium">MEDIUM</span></td>
+      <td>NOT_APPLICABLE</td>
+    </tr><tr>
+      <td><code>INTERACTION|https://example.com/|radio buttons</code></td>
+      <td>Radio buttons</td>
+      <td><span class="badge badge-status-fail">PERSISTENTLY_UNTESTED</span></td>
+      <td><span class="badge badge-conf-medium">MEDIUM</span></td>
+      <td>NOT_APPLICABLE</td>
+    </tr><tr>
+      <td><code>INTERACTION|https://example.com/|selects</code></td>
+      <td>Selects</td>
+      <td><span class="badge badge-status-fail">PERSISTENTLY_UNTESTED</span></td>
+      <td><span class="badge badge-conf-medium">MEDIUM</span></td>
+      <td>NOT_APPLICABLE</td>
+    </tr><tr>
+      <td><code>LANGUAGE||language switching</code></td>
+      <td>Language switching</td>
+      <td><span class="badge badge-status-fail">PERSISTENTLY_UNTESTED</span></td>
+      <td><span class="badge badge-conf-medium">MEDIUM</span></td>
+      <td>NOT_APPLICABLE</td>
+    </tr><tr>
+      <td><code>MEDIA||media playback</code></td>
+      <td>Media playback</td>
+      <td><span class="badge badge-status-fail">PERSISTENTLY_UNTESTED</span></td>
+      <td><span class="badge badge-conf-medium">MEDIUM</span></td>
+      <td>NOT_APPLICABLE</td>
+    </tr><tr>
+      <td><code>PAGE|https://example.com/|page coverage — example domain</code></td>
+      <td>Page coverage — Example Domain</td>
+      <td><span class="badge badge-status-fail">PERSISTENTLY_UNTESTED</span></td>
+      <td><span class="badge badge-conf-medium">MEDIUM</span></td>
+      <td>NOT_TESTED</td>
+    </tr><tr>
+      <td><code>RESPONSIVE_CHECK|https://example.com/|responsive layout</code></td>
+      <td>Responsive layout</td>
+      <td><span class="badge badge-status-fail">PERSISTENTLY_UNTESTED</span></td>
+      <td><span class="badge badge-conf-medium">MEDIUM</span></td>
+      <td>NOT_TESTED</td>
+    </tr><tr>
+      <td><code>SEARCH||site search</code></td>
+      <td>Site search</td>
+      <td><span class="badge badge-status-fail">PERSISTENTLY_UNTESTED</span></td>
+      <td><span class="badge badge-conf-medium">MEDIUM</span></td>
+      <td>NOT_APPLICABLE</td>
+    </tr></tbody></table>
+<h3>Historical relationships (15)</h3><ul><li><strong>COVERAGE_GAP</strong> — <code>ERROR_HANDLING|https://example.com/|link integrity</code> → <code>coverage</code> <span class="sub">(<span class="badge badge-conf-medium">MEDIUM</span> · <code>2026-09-29T06-50-03-348Z-fef851b7</code> <code>2026-10-07T10-44-02-052Z-04cafba8</code>)</span><br><span class="sub">persistently untested — the item was present in multiple runs but never exercised. pattern depends on an absence that was not directly re-tested; the relevant area was meaningfully exercised in the deciding run; 2 runs observed the pattern</span></li><li><strong>COVERAGE_GAP</strong> — <code>FORM|https://example.com/|forms</code> → <code>coverage</code> <span class="sub">(<span class="badge badge-conf-medium">MEDIUM</span> · <code>2026-09-29T06-50-03-348Z-fef851b7</code> <code>2026-10-07T10-44-02-052Z-04cafba8</code>)</span><br><span class="sub">persistently untested — the item was present in multiple runs but never exercised. pattern depends on an absence that was not directly re-tested; the relevant area was meaningfully exercised in the deciding run; 2 runs observed the pattern</span></li><li><strong>COVERAGE_GAP</strong> — <code>INTERACTION|https://example.com/|buttons</code> → <code>coverage</code> <span class="sub">(<span class="badge badge-conf-medium">MEDIUM</span> · <code>2026-09-29T06-50-03-348Z-fef851b7</code> <code>2026-10-07T10-44-02-052Z-04cafba8</code>)</span><br><span class="sub">persistently untested — the item was present in multiple runs but never exercised. pattern depends on an absence that was not directly re-tested; the relevant area was meaningfully exercised in the deciding run; 2 runs observed the pattern</span></li><li><strong>COVERAGE_GAP</strong> — <code>INTERACTION|https://example.com/|checkboxes</code> → <code>coverage</code> <span class="sub">(<span class="badge badge-conf-medium">MEDIUM</span> · <code>2026-09-29T06-50-03-348Z-fef851b7</code> <code>2026-10-07T10-44-02-052Z-04cafba8</code>)</span><br><span class="sub">persistently untested — the item was present in multiple runs but never exercised. pattern depends on an absence that was not directly re-tested; the relevant area was meaningfully exercised in the deciding run; 2 runs observed the pattern</span></li><li><strong>COVERAGE_GAP</strong> — <code>INTERACTION|https://example.com/|inputs</code> → <code>coverage</code> <span class="sub">(<span class="badge badge-conf-medium">MEDIUM</span> · <code>2026-09-29T06-50-03-348Z-fef851b7</code> <code>2026-10-07T10-44-02-052Z-04cafba8</code>)</span><br><span class="sub">persistently untested — the item was present in multiple runs but never exercised. pattern depends on an absence that was not directly re-tested; the relevant area was meaningfully exercised in the deciding run; 2 runs observed the pattern</span></li><li><strong>COVERAGE_GAP</strong> — <code>INTERACTION|https://example.com/|language controls</code> → <code>coverage</code> <span class="sub">(<span class="badge badge-conf-medium">MEDIUM</span> · <code>2026-09-29T06-50-03-348Z-fef851b7</code> <code>2026-10-07T10-44-02-052Z-04cafba8</code>)</span><br><span class="sub">persistently untested — the item was present in multiple runs but never exercised. pattern depends on an absence that was not directly re-tested; the relevant area was meaningfully exercised in the deciding run; 2 runs observed the pattern</span></li><li><strong>COVERAGE_GAP</strong> — <code>INTERACTION|https://example.com/|media controls</code> → <code>coverage</code> <span class="sub">(<span class="badge badge-conf-medium">MEDIUM</span> · <code>2026-09-29T06-50-03-348Z-fef851b7</code> <code>2026-10-07T10-44-02-052Z-04cafba8</code>)</span><br><span class="sub">persistently untested — the item was present in multiple runs but never exercised. pattern depends on an absence that was not directly re-tested; the relevant area was meaningfully exercised in the deciding run; 2 runs observed the pattern</span></li><li><strong>COVERAGE_GAP</strong> — <code>INTERACTION|https://example.com/|navigation controls</code> → <code>coverage</code> <span class="sub">(<span class="badge badge-conf-medium">MEDIUM</span> · <code>2026-09-29T06-50-03-348Z-fef851b7</code> <code>2026-10-07T10-44-02-052Z-04cafba8</code>)</span><br><span class="sub">persistently untested — the item was present in multiple runs but never exercised. pattern depends on an absence that was not directly re-tested; the relevant area was meaningfully exercised in the deciding run; 2 runs observed the pattern</span></li><li><strong>COVERAGE_GAP</strong> — <code>INTERACTION|https://example.com/|radio buttons</code> → <code>coverage</code> <span class="sub">(<span class="badge badge-conf-medium">MEDIUM</span> · <code>2026-09-29T06-50-03-348Z-fef851b7</code> <code>2026-10-07T10-44-02-052Z-04cafba8</code>)</span><br><span class="sub">persistently untested — the item was present in multiple runs but never exercised. pattern depends on an absence that was not directly re-tested; the relevant area was meaningfully exercised in the deciding run; 2 runs observed the pattern</span></li><li><strong>COVERAGE_GAP</strong> — <code>INTERACTION|https://example.com/|selects</code> → <code>coverage</code> <span class="sub">(<span class="badge badge-conf-medium">MEDIUM</span> · <code>2026-09-29T06-50-03-348Z-fef851b7</code> <code>2026-10-07T10-44-02-052Z-04cafba8</code>)</span><br><span class="sub">persistently untested — the item was present in multiple runs but never exercised. pattern depends on an absence that was not directly re-tested; the relevant area was meaningfully exercised in the deciding run; 2 runs observed the pattern</span></li><li><strong>COVERAGE_GAP</strong> — <code>LANGUAGE||language switching</code> → <code>coverage</code> <span class="sub">(<span class="badge badge-conf-medium">MEDIUM</span> · <code>2026-09-29T06-50-03-348Z-fef851b7</code> <code>2026-10-07T10-44-02-052Z-04cafba8</code>)</span><br><span class="sub">persistently untested — the item was present in multiple runs but never exercised. pattern depends on an absence that was not directly re-tested; the relevant area was meaningfully exercised in the deciding run; 2 runs observed the pattern</span></li><li><strong>COVERAGE_GAP</strong> — <code>MEDIA||media playback</code> → <code>coverage</code> <span class="sub">(<span class="badge badge-conf-medium">MEDIUM</span> · <code>2026-09-29T06-50-03-348Z-fef851b7</code> <code>2026-10-07T10-44-02-052Z-04cafba8</code>)</span><br><span class="sub">persistently untested — the item was present in multiple runs but never exercised. pattern depends on an absence that was not directly re-tested; the relevant area was meaningfully exercised in the deciding run; 2 runs observed the pattern</span></li><li><strong>COVERAGE_GAP</strong> — <code>PAGE|https://example.com/|page coverage — example domain</code> → <code>coverage</code> <span class="sub">(<span class="badge badge-conf-medium">MEDIUM</span> · <code>2026-09-29T06-50-03-348Z-fef851b7</code> <code>2026-10-07T10-44-02-052Z-04cafba8</code>)</span><br><span class="sub">persistently untested — the item was present in multiple runs but never exercised. pattern depends on an absence that was not directly re-tested; the relevant area was meaningfully exercised in the deciding run; 2 runs observed the pattern</span></li><li><strong>COVERAGE_GAP</strong> — <code>RESPONSIVE_CHECK|https://example.com/|responsive layout</code> → <code>coverage</code> <span class="sub">(<span class="badge badge-conf-medium">MEDIUM</span> · <code>2026-09-29T06-50-03-348Z-fef851b7</code> <code>2026-10-07T10-44-02-052Z-04cafba8</code>)</span><br><span class="sub">persistently untested — the item was present in multiple runs but never exercised. pattern depends on an absence that was not directly re-tested; the relevant area was meaningfully exercised in the deciding run; 2 runs observed the pattern</span></li><li><strong>COVERAGE_GAP</strong> — <code>SEARCH||site search</code> → <code>coverage</code> <span class="sub">(<span class="badge badge-conf-medium">MEDIUM</span> · <code>2026-09-29T06-50-03-348Z-fef851b7</code> <code>2026-10-07T10-44-02-052Z-04cafba8</code>)</span><br><span class="sub">persistently untested — the item was present in multiple runs but never exercised. pattern depends on an absence that was not directly re-tested; the relevant area was meaningfully exercised in the deciding run; 2 runs observed the pattern</span></li></ul>
+<h3>Limitations</h3><ul><li class="sub">based on 2 ordered runs — more history strengthens every claim</li><li class="sub">15 coverage area(s) show un-tested or lost status — absence is discovery variance, never a loss claim</li><li class="sub">classification is deterministic and confidence-aware; no overall quality or health score is offered</li></ul>
+  <p class="sub">Evidence first, interpretation second, AI optional. No overall quality or health score is offered.</p>
+</section>
+
+
+
+<section>
+  <h2>Scan Information</h2>
+  <table><tbody>
+    <tr><th>URL</th><td><a href="https://example.com">https://example.com</a></td></tr>
+    <tr><th>Final URL</th><td><a href="https://example.com/">https://example.com/</a></td></tr>
+    <tr><th>HTTP status</th><td>200</td></tr>
+    <tr><th>Page title</th><td>Example Domain</td></tr>
+    <tr><th>Language</th><td>en</td></tr>
+    <tr><th>Viewport meta</th><td>width=device-width,initial-scale=1</td></tr>
+    <tr><th>Authentication</th><td>none; accepted: true</td></tr>
+    <tr><th>Scan time</th><td>2026-10-07T10:44:01.849Z (4032 ms)</td></tr>
+  </tbody></table>
+</section>
+
+<section>
+  <h2>Performance</h2>
+  <p class="sub">Measured during the scan. Metrics are checked against the performance budgets file only when one was configured (<code>--perf-budgets</code> or <code>perf.budgets</code> in qa.config.json); a breach is an ordinary CRITICAL finding, never a separate gate or a new exit code.</p>
+  <table><tbody><tr><th>TTFB</th><td>2823 ms</td></tr><tr><th>FCP</th><td>2896 ms</td></tr><tr><th>LCP</th><td>3048 ms</td></tr><tr><th>CLS</th><td>unavailable</td></tr><tr><th>DOM Content Loaded</th><td>3037 ms</td></tr><tr><th>Load Event</th><td>3038 ms</td></tr></tbody></table>
+  <p class="sub">No configured performance budget was exceeded.</p>
+</section>
+
+<section>
+  <h2>QA Findings by Severity</h2>
+  <table><thead><tr><th>Severity</th><th>Description</th><th>Findings</th></tr></thead><tbody><tr><td><span class="badge badge-critical">CRITICAL</span></td><td>Critical</td><td class="num">0</td></tr><tr><td><span class="badge badge-high">HIGH</span></td><td>High</td><td class="num">0</td></tr><tr><td><span class="badge badge-medium">MEDIUM</span></td><td>Medium</td><td class="num">0</td></tr><tr><td><span class="badge badge-low">LOW</span></td><td>Low</td><td class="num">0</td></tr><tr><td><span class="badge badge-info">INFO</span></td><td>Informational</td><td class="num">0</td></tr></tbody></table>
+  
+</section>
+
+<section>
+  <h2>Finding Status</h2>
+  <p class="sub">Lifecycle: DISCOVERED → ANALYZED → TEST_GENERATED → TEST_EXECUTED → REPRODUCED / NOT_REPRODUCED / PASS / REVIEW. A finding stays visible even when verification cannot reproduce it — nothing is silently dropped.</p>
+  <div class="empty">No findings.</div>
+</section>
+
+<section>
+  <h2>Verification Disposition</h2>
+  <p class="sub">Explicit per-finding disposition: what did the scanner find, was it analyzed, was it tested, was it reproduced — and if it was not tested, exactly why not (unsupported code, unsafe/ambiguous/fragile locator, or safety guard).</p>
+  <div class="empty">No verification run attached. Run with <code>--execute</code> to compute finding dispositions on the live page.</div>
+</section>
+
+<section>
+  <h2>Verification Results</h2>
+  <p class="sub">Outcome classes: REPRODUCED/WEBSITE (live DOM matches the signal), NOT_REPRODUCED/LOCATOR (element absent), NOT_REPRODUCED/EXPECTATION or PASS (element present but clean), CONDITIONAL (state-dependent UI), REVIEW/INFRASTRUCTURE (runner/network — not evidence about the site).</p>
+  <p class="sub">Disposition counts: 0 scheduled, 0 executed, 0 reproduced, 0 not reproduced, 0 passed, 0 review required, 0 skipped (unsupported), 0 skipped (locator guard), 0 skipped (safety), 0 infrastructure.</p>
+  <div class="empty">No verification results attached. Run with <code>--execute</code> to confirm findings on the live page.</div>
+</section>
+
+<section>
+  <h2>Accessibility Findings</h2>
+  <div class="empty">No accessibility findings.</div>
+</section>
+
+<section>
+  <h2>Navigation Findings</h2>
+  <div class="empty">No navigation findings.</div>
+</section>
+
+<section>
+  <h2>User Flows</h2>
+  <div class="card flow">
+  <div class="finding-head"><strong>Primary navigation</strong> <span class="badge badge-flow">navigation</span> <span class="badge badge-state">high</span> <span class="badge badge-state">identified</span></div>
+  <div class="sub">The page exposes 1 HTTP link(s). Verify the main navigation resolves without errors (coverage is captured by SC-NAV-INTEGRITY).</div>
+  
+  <div class="sub">Trigger: <code>page.getByRole(&quot;link&quot;, { name: &quot;Learn more&quot; })</code></div>
+  <ul class="flow-el"><li>link "Learn more" — visible</li></ul>
+  <div class="sub">Related: <code>SC-001</code> <code>SC-002</code> <code>SC-003</code></div>
+</div>
+</section>
+
+<section>
+  <h2>Flow Discovery</h2>
+  <p class="sub">Phase 3 autonomous discovery: site-graph facts → user flows → safe execution. Every step is classified deterministically; only SAFE + AUTOMATED steps run. REVIEW/HIGH_RISK/BLOCKED steps are recorded as boundaries and stopped before execution.</p>
+  
+    <p class="sub">Limits: 1/8 pages · max depth 3 · 20 max flows · 6 steps per flow.</p>
+    <p class="sub">Counts: 0 discovered · 0 executable · 0 review · 0 high-risk · 0 blocked · 0 steps.</p>
+    <p class="sub">Execution: 0 run · 0 passed · 0 reproduced · 0 not reproduced · 0 review required · 0 infrastructure.</p>
+    <h3>Site graph</h3><table><thead><tr><th>Page</th><th>URL</th><th>Title</th><th>Depth</th><th>Controls</th><th>Links</th><th>Broken</th></tr></thead><tbody>
+    <tr>
+      <td><code>page-1</code></td>
+      <td><a href="https://example.com">https://example.com</a></td>
+      <td class="sub">Example Domain</td>
+      <td class="num">0</td>
+      <td class="num">0</td>
+      <td class="num">1</td>
+      <td class="num">0</td>
+    </tr>
+  </tbody></table>
+    <h3>Discovered flows</h3><div class="empty">No user flows discovered on this page set.</div>
+</section>
+
+<section>
+  <h2>Coverage Overview</h2>
+  <p class="sub">Phase 4: what is tested, what is only partially tested, what could not be tested safely, what remains uncovered — and what QA should investigate next. Every item and recommendation traces to evidence.</p>
+  
+    <p class="sub">Evidence-based coverage: TESTED requires execution evidence (a flow step, a verification probe, or a live scanner read such as link-integrity). Scanning an element is a fact, never a test; responsive coverage is never claimed from a desktop-only scan.</p>
+    <div class="grid"><div class="card"><strong>1</strong>Pages discovered</div><div class="card"><strong>0</strong>Pages tested</div><div class="card"><strong>0</strong>Pages partial</div><div class="card"><strong>1</strong>Pages untested</div><div class="card"><strong>0</strong>Pages blocked</div><div class="card"><strong>0</strong>Pages review</div><div class="card"><strong>0</strong>Flows discovered</div><div class="card"><strong>0</strong>Flows executed</div><div class="card"><strong>0</strong>Passed</div><div class="card"><strong>0</strong>Reproduced</div><div class="card"><strong>0</strong>Not reproduced</div><div class="card"><strong>0</strong>Review required</div><div class="card"><strong>0</strong>Blocked</div><div class="card"><strong>1</strong>Interactions tested</div><div class="card"><strong>0</strong>Interactions partial</div><div class="card"><strong>0</strong>Interactions untested</div><div class="card"><strong>0</strong>Findings analyzed</div><div class="card"><strong>0</strong>Findings verified</div><div class="card"><strong>0</strong>Findings reproduced</div><div class="card"><strong>0</strong>Findings not reproduced</div><div class="card"><strong>0</strong>Findings unverified</div><div class="card"><strong>3</strong>Test-plan actions</div></div>
+    <h3>Test plan (what QA should do next)</h3><div class="card fix">
+    <div class="finding-head"><code>REC-001</code> <span class="badge badge-prio">P1</span> <strong>Investigate — Link integrity</strong></div>
+    <div class="chips">Error states (broken links, uncaught errors, HTTP failures) block whole journeys and need investigation.</div>
+    <div class="sub">Coverage: ERROR_HANDLING NOT_TESTED. No link-integrity run recorded for this report.</div>
+    <div class="sub">Coverage: <code>COV-ERROR-001</code></div>
+  </div><div class="card fix">
+    <div class="finding-head"><code>REC-002</code> <span class="badge badge-prio">P2</span> <strong>Test untested page — Page coverage — Example Domain</strong></div>
+    <div class="chips">Pages matter when their flows execute — a scanned-but-untested page answers nothing about its behavior. Run with --execute.</div>
+    <div class="sub">Coverage: PAGE NOT_TESTED. Discovered and scanned (0 control(s), 1 link(s)) but no flow or executed check is attached to this page. Run with --execute.</div>
+    <div class="sub">Coverage: <code>COV-PAGE-001</code></div>
+  </div><div class="card fix">
+    <div class="finding-head"><code>REC-003</code> <span class="badge badge-prio">P3</span> <strong>Run responsive checks (Responsive layout)</strong></div>
+    <div class="chips">Responsive coverage needs tablet/mobile execution; the desktop scan alone cannot claim it.</div>
+    <div class="sub">Coverage: RESPONSIVE_CHECK NOT_TESTED. Responsive coverage requires executing tablet and mobile viewports. This phase scans the desktop viewport only — the declared viewport meta is meta-data, not responsive evidence.</div>
+    <div class="sub">Coverage: <code>COV-RESPONSIVE-001</code></div>
+  </div>
+    <h3>Coverage gaps (deterministic + AI reword)</h3><ul><li>Responsive behaviour is NOT_TESTED — current scan is desktop-viewport only.</li></ul>
+    <h3>PAGE</h3><table><thead><tr><th>ID</th><th>Status</th><th>Coverage item</th><th>Safety</th><th>Execution</th><th>Related</th><th>Evidence</th></tr></thead><tbody><tr>
+      <td><code>COV-PAGE-001</code></td>
+      <td><span class="badge badge-state">NOT_TESTED</span></td>
+      <td><span class="q">Page coverage — Example Domain</span><br><span class="sub">Discovered and scanned (0 control(s), 1 link(s)) but no flow or executed check is attached to this page. Run with --execute.</span></td>
+      <td>SAFE</td>
+      <td class="sub">—</td>
+      <td>—</td>
+      <td><ol class="ev"><li>Example Domain (https://example.com)</li></ol></td>
+    </tr></tbody></table><h3>INTERACTION</h3><table><thead><tr><th>ID</th><th>Status</th><th>Coverage item</th><th>Safety</th><th>Execution</th><th>Related</th><th>Evidence</th></tr></thead><tbody><tr>
+      <td><code>COV-INTERACTION-LINKS</code></td>
+      <td><span class="badge badge-status-pass">TESTED</span></td>
+      <td><span class="q">Links</span><br><span class="sub">All 0 site navigation edge(s) exercised by passing flows.</span></td>
+      <td>SAFE</td>
+      <td class="sub">PASS</td>
+      <td>—</td>
+      <td><ol class="ev"><li>Links: 1 element(s) on the scanned page.</li></ol></td>
+    </tr><tr>
+      <td><code>COV-INTERACTION-BUTTONS</code></td>
+      <td><span class="badge badge-conf-low">NOT_APPLICABLE</span></td>
+      <td><span class="q">Buttons</span><br><span class="sub">No buttons on the scanned page.</span></td>
+      <td>NOT_APPLICABLE</td>
+      <td class="sub">—</td>
+      <td>—</td>
+      <td><ol class="ev"><li>Buttons: 0 element(s) on the scanned page.</li></ol></td>
+    </tr><tr>
+      <td><code>COV-INTERACTION-INPUTS</code></td>
+      <td><span class="badge badge-conf-low">NOT_APPLICABLE</span></td>
+      <td><span class="q">Inputs</span><br><span class="sub">No inputs on the scanned page.</span></td>
+      <td>NOT_APPLICABLE</td>
+      <td class="sub">—</td>
+      <td>—</td>
+      <td><ol class="ev"><li>Inputs: 0 element(s) on the scanned page.</li></ol></td>
+    </tr><tr>
+      <td><code>COV-INTERACTION-CHECKBOXES</code></td>
+      <td><span class="badge badge-conf-low">NOT_APPLICABLE</span></td>
+      <td><span class="q">Checkboxes</span><br><span class="sub">No checkboxes on the scanned page.</span></td>
+      <td>NOT_APPLICABLE</td>
+      <td class="sub">—</td>
+      <td>—</td>
+      <td><ol class="ev"><li>Checkboxes: 0 element(s) on the scanned page.</li></ol></td>
+    </tr><tr>
+      <td><code>COV-INTERACTION-RADIOS</code></td>
+      <td><span class="badge badge-conf-low">NOT_APPLICABLE</span></td>
+      <td><span class="q">Radio buttons</span><br><span class="sub">No radio buttons on the scanned page.</span></td>
+      <td>NOT_APPLICABLE</td>
+      <td class="sub">—</td>
+      <td>—</td>
+      <td><ol class="ev"><li>Radio buttons: 0 element(s) on the scanned page.</li></ol></td>
+    </tr><tr>
+      <td><code>COV-INTERACTION-SELECTS</code></td>
+      <td><span class="badge badge-conf-low">NOT_APPLICABLE</span></td>
+      <td><span class="q">Selects</span><br><span class="sub">No selects on the scanned page.</span></td>
+      <td>NOT_APPLICABLE</td>
+      <td class="sub">—</td>
+      <td>—</td>
+      <td><ol class="ev"><li>Selects: 0 element(s) on the scanned page.</li></ol></td>
+    </tr><tr>
+      <td><code>COV-INTERACTION-MEDIA</code></td>
+      <td><span class="badge badge-conf-low">NOT_APPLICABLE</span></td>
+      <td><span class="q">Media controls</span><br><span class="sub">No media controls on the scanned page.</span></td>
+      <td>NOT_APPLICABLE</td>
+      <td class="sub">—</td>
+      <td>—</td>
+      <td><ol class="ev"><li>Media controls: 0 element(s) on the scanned page.</li></ol></td>
+    </tr><tr>
+      <td><code>COV-INTERACTION-LANGUAGE</code></td>
+      <td><span class="badge badge-conf-low">NOT_APPLICABLE</span></td>
+      <td><span class="q">Language controls</span><br><span class="sub">No language controls on the scanned page.</span></td>
+      <td>NOT_APPLICABLE</td>
+      <td class="sub">—</td>
+      <td>—</td>
+      <td><ol class="ev"><li>Language controls: 0 element(s) on the scanned page.</li></ol></td>
+    </tr><tr>
+      <td><code>COV-INTERACTION-NAVIGATION</code></td>
+      <td><span class="badge badge-conf-low">NOT_APPLICABLE</span></td>
+      <td><span class="q">Navigation controls</span><br><span class="sub">No navigation controls on the scanned page.</span></td>
+      <td>NOT_APPLICABLE</td>
+      <td class="sub">—</td>
+      <td>—</td>
+      <td><ol class="ev"><li>Navigation controls: 0 element(s) on the scanned page.</li></ol></td>
+    </tr></tbody></table><h3>FORM</h3><table><thead><tr><th>ID</th><th>Status</th><th>Coverage item</th><th>Safety</th><th>Execution</th><th>Related</th><th>Evidence</th></tr></thead><tbody><tr>
+      <td><code>COV-FORM-000</code></td>
+      <td><span class="badge badge-conf-low">NOT_APPLICABLE</span></td>
+      <td><span class="q">Forms</span><br><span class="sub">No forms were discovered on the scanned pages.</span></td>
+      <td>NOT_APPLICABLE</td>
+      <td class="sub">—</td>
+      <td>—</td>
+      <td><ol class="ev"><li>Example Domain (https://example.com)</li></ol></td>
+    </tr></tbody></table><h3>SEARCH</h3><table><thead><tr><th>ID</th><th>Status</th><th>Coverage item</th><th>Safety</th><th>Execution</th><th>Related</th><th>Evidence</th></tr></thead><tbody><tr>
+      <td><code>COV-SEARCH-000</code></td>
+      <td><span class="badge badge-conf-low">NOT_APPLICABLE</span></td>
+      <td><span class="q">Site search</span><br><span class="sub">No search control discovered on the scanned pages.</span></td>
+      <td>NOT_APPLICABLE</td>
+      <td class="sub">—</td>
+      <td>—</td>
+      <td><ol class="ev"><li>Example Domain (https://example.com)</li></ol></td>
+    </tr></tbody></table><h3>LANGUAGE</h3><table><thead><tr><th>ID</th><th>Status</th><th>Coverage item</th><th>Safety</th><th>Execution</th><th>Related</th><th>Evidence</th></tr></thead><tbody><tr>
+      <td><code>COV-LANG-000</code></td>
+      <td><span class="badge badge-conf-low">NOT_APPLICABLE</span></td>
+      <td><span class="q">Language switching</span><br><span class="sub">No language-switch control discovered on the scanned pages.</span></td>
+      <td>NOT_APPLICABLE</td>
+      <td class="sub">—</td>
+      <td>—</td>
+      <td><ol class="ev"><li>Example Domain (https://example.com)</li></ol></td>
+    </tr></tbody></table><h3>MEDIA</h3><table><thead><tr><th>ID</th><th>Status</th><th>Coverage item</th><th>Safety</th><th>Execution</th><th>Related</th><th>Evidence</th></tr></thead><tbody><tr>
+      <td><code>COV-MEDIA-000</code></td>
+      <td><span class="badge badge-conf-low">NOT_APPLICABLE</span></td>
+      <td><span class="q">Media playback</span><br><span class="sub">No media controls discovered on the scanned pages.</span></td>
+      <td>NOT_APPLICABLE</td>
+      <td class="sub">—</td>
+      <td>—</td>
+      <td><ol class="ev"><li>Example Domain (https://example.com)</li></ol></td>
+    </tr></tbody></table><h3>ERROR_HANDLING</h3><table><thead><tr><th>ID</th><th>Status</th><th>Coverage item</th><th>Safety</th><th>Execution</th><th>Related</th><th>Evidence</th></tr></thead><tbody><tr>
+      <td><code>COV-ERROR-001</code></td>
+      <td><span class="badge badge-state">NOT_TESTED</span></td>
+      <td><span class="q">Link integrity</span><br><span class="sub">No link-integrity run recorded for this report.</span></td>
+      <td>REVIEW</td>
+      <td class="sub">—</td>
+      <td>—</td>
+      <td><ol class="ev"><li>Example Domain (https://example.com)</li></ol></td>
+    </tr><tr>
+      <td><code>COV-ERROR-002</code></td>
+      <td><span class="badge badge-status-pass">TESTED</span></td>
+      <td><span class="q">Uncaught page / console errors</span><br><span class="sub">No uncaught page errors or first-party console errors observed during the scan.</span></td>
+      <td>SAFE</td>
+      <td class="sub">—</td>
+      <td>—</td>
+      <td><ol class="ev"><li>Example Domain (https://example.com)</li></ol></td>
+    </tr><tr>
+      <td><code>COV-ERROR-003</code></td>
+      <td><span class="badge badge-status-pass">TESTED</span></td>
+      <td><span class="q">Start page navigation</span><br><span class="sub">Start page loaded with HTTP 200 — live scanner evidence.</span></td>
+      <td>SAFE</td>
+      <td class="sub">—</td>
+      <td>—</td>
+      <td><ol class="ev"><li>Example Domain (https://example.com)</li></ol></td>
+    </tr></tbody></table><h3>RESPONSIVE_CHECK</h3><table><thead><tr><th>ID</th><th>Status</th><th>Coverage item</th><th>Safety</th><th>Execution</th><th>Related</th><th>Evidence</th></tr></thead><tbody><tr>
+      <td><code>COV-RESPONSIVE-001</code></td>
+      <td><span class="badge badge-state">NOT_TESTED</span></td>
+      <td><span class="q">Responsive layout</span><br><span class="sub">Responsive coverage requires executing tablet and mobile viewports. This phase scans the desktop viewport only — the declared viewport meta is meta-data, not responsive evidence.</span></td>
+      <td>SAFE</td>
+      <td class="sub">—</td>
+      <td>—</td>
+      <td><ol class="ev"><li>Example Domain (https://example.com)</li></ol></td>
+    </tr></tbody></table>
+</section>
+
+<section>
+  <h2>Automated Test Coverage</h2>
+  <p class="sub"><code>https://example.com</code> — 3 automated element scenario(s); counted here as the executable smoke surface.</p>
+  <h3>Automated element scenarios</h3>
+  <div class="card scenario">
+    <div class="finding-head"><code>SC-001</code> <strong>Link &quot;Learn more&quot; is visible</strong> <span class="badge badge-risk safe">safe</span> <span class="badge badge-auto">auto</span> <span class="badge badge-intent">NAVIGATION</span> <span class="badge badge-prio">P2</span></div>
+    <div class="sub">Verifies the link labeled &quot;Learn more&quot; is rendered and visible to the user.</div>
+    <div class="chips">Structural check; no state change.</div>
+    <div class="sub">Locator: <code>page.getByRole(&quot;link&quot;, { name: &quot;Learn more&quot; })</code></div>
+    
+  </div><div class="card scenario">
+    <div class="finding-head"><code>SC-002</code> <strong>Link &quot;Learn more&quot; has an accessible name</strong> <span class="badge badge-risk safe">safe</span> <span class="badge badge-auto">auto</span> <span class="badge badge-intent">ACCESSIBILITY</span> <span class="badge badge-prio">P2</span></div>
+    <div class="sub">Ensures the link exposes the accessible name &quot;Learn more&quot; for screen readers.</div>
+    <div class="chips">Structural check; no state change.</div>
+    <div class="sub">Locator: <code>page.getByRole(&quot;link&quot;, { name: &quot;Learn more&quot; })</code></div>
+    
+  </div><div class="card scenario">
+    <div class="finding-head"><code>SC-NAV-INTEGRITY</code> <strong>Discovered links resolve without HTTP errors</strong> <span class="badge badge-risk safe">safe</span> <span class="badge badge-auto">auto</span> <span class="badge badge-intent">NAVIGATION</span> <span class="badge badge-prio">P2</span></div>
+    <div class="sub">Confirms the scan found no broken or errored links among the checked URLs.</div>
+    <div class="chips">Summary check; no state change.</div>
+    
+    
+  </div>
+  <h3>Verification intent scenarios</h3>
+  <div class="card scenario">
+    <div class="finding-head"><code>SC-NAVIGATION-001</code> <strong>Primary navigation</strong> <span class="badge badge-intent">NAVIGATION</span> <span class="badge badge-prio">P2</span> <span class="badge badge-state">AUTOMATED</span></div>
+    <div class="sub">The page exposes 1 HTTP link(s). Verify the main navigation resolves without errors (coverage is captured by SC-NAV-INTEGRITY).</div>
+    <div class="chips">Verification-only scenario; it inspects link responses without changing state or entering data.</div>
+    
+    <div class="sub">Related: <code>SC-001</code> <code>SC-002</code> <code>SC-003</code> <code>SC-NAV-INTEGRITY</code></div>
+  </div>
+</section>
+
+<section>
+  <h2>Manual / Review Scenarios</h2>
+  <p class="sub">1 review test(s) are parked as <code>test.fixme</code> placeholders in the generated spec; 1 scenario(s) across all manual work streams.</p>
+  <h3>Intent scenarios needing review</h3>
+  <div class="empty">None.</div>
+  <h3>Element scenarios marked manual/review</h3>
+  <div class="card scenario">
+    <div class="finding-head"><code>SC-003</code> <strong>Clicking link &quot;Learn more&quot; navigates without an HTTP error</strong> <span class="badge badge-risk review">review</span> <span class="badge badge-manual">manual</span> <span class="badge badge-intent">NAVIGATION</span> <span class="badge badge-prio">P2</span></div>
+    <div class="sub">Clicks the link and verifies the page navigates successfully without a client or server error.</div>
+    <div class="chips">Clicking navigates away from the current page; destination must be verified.</div>
+    <div class="sub">Locator: <code>page.getByRole(&quot;link&quot;, { name: &quot;Learn more&quot; })</code></div>
+    
+  </div>
+</section>
+
+<section>
+  <h2>High-Risk Scenarios</h2>
+  <p class="sub">These scenarios are never automated. 0 high-risk element scenario(s) exist; review before any manual execution.</p>
+  <div class="empty">None.</div>
+</section>
+
+<section>
+  <h2>Detailed Evidence</h2>
+  <table><thead><tr><th>ID</th><th>Severity</th><th>Finding</th><th>Evidence trail</th><th>Rationale</th></tr></thead><tbody>
+  
+  </tbody></table>
+</section>
+
+<section>
+  <h2>Recommended Fixes</h2>
+  <div class="empty">No recommended fixes.</div>
+</section>
+
+<section>
+  <h2>Test Execution Results</h2>
+  <div class="empty">No test execution run was attached. Run with <code>--execute</code> to attach results.</div>
+</section>
+
+</main></body></html>

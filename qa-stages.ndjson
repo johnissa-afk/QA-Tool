@@ -1,0 +1,14 @@
+{"stage":"scan","state":"started","timestamp":"2026-10-07T10:43:57.560Z"}
+{"stage":"scan","state":"completed","timestamp":"2026-10-07T10:44:02.041Z"}
+{"stage":"access","state":"started","timestamp":"2026-10-07T10:44:02.042Z"}
+{"stage":"access","state":"completed","timestamp":"2026-10-07T10:44:02.043Z"}
+{"stage":"generate","state":"started","timestamp":"2026-10-07T10:44:02.044Z"}
+{"stage":"generate","state":"completed","timestamp":"2026-10-07T10:44:02.049Z"}
+{"stage":"analyze","state":"started","timestamp":"2026-10-07T10:44:02.050Z"}
+{"stage":"analyze","state":"completed","timestamp":"2026-10-07T10:44:02.067Z"}
+{"stage":"coverage","state":"started","timestamp":"2026-10-07T10:44:02.068Z"}
+{"stage":"coverage","state":"completed","timestamp":"2026-10-07T10:44:02.070Z"}
+{"stage":"history","state":"started","timestamp":"2026-10-07T10:44:02.074Z"}
+{"stage":"history","state":"completed","timestamp":"2026-10-07T10:44:02.142Z"}
+{"stage":"complete","state":"started","timestamp":"2026-10-07T10:44:02.157Z"}
+{"stage":"complete","state":"completed","timestamp":"2026-10-07T10:44:02.157Z"}

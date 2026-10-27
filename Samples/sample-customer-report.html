@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Website QA report for devv2ayn.dotcomlb.com</title>
+<style>
+:root{--ink:#16202c;--mute:#566475;--line:#d8dfe8;--bg:#eef1f5;--card:#fff;--high:#b42318;--med:#b54708;--low:#2f5aa8;--ok:#067647}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:46rem;margin:0 auto;padding:2rem 1.25rem 4rem}
+header{padding:1.5rem 0 1rem}
+.site{color:var(--mute);margin:0 0 1rem;font-size:.95rem}
+h1{font:600 clamp(1.7rem,4.6vw,2.5rem)/1.15 Georgia,"Iowan Old Style",serif;margin:0 0 .6rem;letter-spacing:-.01em}
+.lede{font-size:1.1rem;margin:0;max-width:38rem}
+h2{font:600 1.35rem/1.2 Georgia,"Iowan Old Style",serif;margin:2.6rem 0 .3rem}
+h2+p{margin:0 0 1rem;color:var(--mute)}
+ol,ul{padding:0;margin:0;list-style:none}
+.items{counter-reset:n}
+.item{counter-increment:n;background:var(--card);border:1px solid var(--line);border-left:5px solid var(--low);border-radius:6px;padding:1rem 1.15rem;margin:0 0 .9rem}
+.item.sev-HIGH,.item.sev-CRITICAL{border-left-color:var(--high)}.item.sev-MEDIUM{border-left-color:var(--med)}
+.top{display:flex;justify-content:space-between;gap:1rem;align-items:baseline;flex-wrap:wrap}
+h3{font-size:1.08rem;margin:0}h3::before{content:counter(n) ". ";color:var(--mute);font-weight:500}
+.count{font-weight:600;white-space:nowrap}
+p{margin:.45rem 0}.meta{margin:.35rem 0 .6rem}
+.tag{display:inline-block;font-size:.8rem;padding:.1rem .55rem;border-radius:99px;border:1px solid var(--line);background:#f6f8fa;margin-right:.25rem}
+.tag.ok{color:var(--ok);border-color:#a6d8bf}.tag.warn{color:var(--med);border-color:#f0c79a}.tag.bad{color:var(--high);border-color:#efb1ab}.tag.na{color:var(--mute)}
+pre{background:#f3f5f8;border:1px solid var(--line);border-radius:5px;padding:.6rem .8rem;overflow-x:auto;margin:.4rem 0;font:.85rem/1.5 ui-monospace,Consolas,monospace;white-space:pre-wrap}
+.effort{color:var(--mute);font-size:.9rem}
+details{margin-top:.5rem}summary{cursor:pointer;color:var(--low);font-weight:500}summary:focus-visible{outline:2px solid var(--low);outline-offset:2px}
+.ex li{padding:.2rem 0;font:.85rem/1.4 ui-monospace,Consolas,monospace;overflow-wrap:anywhere}
+table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:6px}
+td{padding:.7rem .9rem;border-bottom:1px solid var(--line);vertical-align:top}tr:last-child td{border-bottom:0}.num{font:600 1.15rem Georgia,serif;white-space:nowrap}
+.checked li{padding:.3rem 0 .3rem 1.2rem;position:relative}.checked li::before{content:"✓";position:absolute;left:0;color:var(--ok)}
+.notes li{padding:.35rem 0;color:var(--mute)}
+footer{margin-top:3rem;color:var(--mute);font-size:.85rem}
+@media print{body{background:#fff}.item{break-inside:avoid}details{display:none}}
+</style></head><body><main>
+<header>
+<p class="site">Sample client · devv2ayn.dotcomlb.com · scanned 2026-10-06</p>
+<h1>4 things to fix. Start with links with no readable name.</h1>
+<p class="lede">182 links affected by the first issue alone. Fixing it is usually one shared template change.</p>
+</header>
+
+<h2>Fix these first</h2>
+<p>Ordered by how many visitors each issue is likely to affect, then by how many places it appears.</p>
+<ol class="items"><li class="item sev-HIGH">
+  <div class="top"><h3>Links with no readable name</h3><span class="count">182 links</span></div>
+  <p class="meta"><span class="tag sev">High priority</span> <span class="tag plain">Detected by the scan</span></p>
+  <p><b>Why it matters.</b> Screen-reader users hear only “link” and cannot tell where it goes. Search engines also get less context about the target page.</p>
+  <p><b>How to fix it.</b> </p>
+  <pre>&lt;a href=&quot;/radio-shows&quot; aria-label=&quot;Radio shows&quot;&gt;…&lt;/a&gt;</pre>
+  <p class="effort">Effort: Usually one shared template change</p>
+  <details><summary>Where we saw it</summary><ul class="ex"><li dir="auto">&lt;a&gt;  https://devv2ayn.dotcomlb.com/</li><li dir="auto">&lt;a&gt;  javascript:void(0)</li><li dir="auto">&lt;a&gt;  https://devv2ayn.dotcomlb.com/show/240547/%D8%AD%D8%AF%D9%8A%D8%AB-%D8%A7%D9%84%D8%B4%D8%A8%D8%A7%D8%A8</li></ul><p class="effort">…and 179 more. The full list is in the data export.</p></details>
+</li>
+<li class="item sev-MEDIUM">
+  <div class="top"><h3>Errors from your own code</h3><span class="count">1 error</span></div>
+  <p class="meta"><span class="tag sev">Medium priority</span> <span class="tag plain">Detected by the scan</span></p>
+  <p><b>Why it matters.</b> These usually mean a feature failed or a resource was blocked, and visitors may hit the same problem.</p>
+  <p><b>How to fix it.</b> Open the browser console on the page, find the failing script, fix it, and re-run the scan.</p>
+  
+  <p class="effort">Effort: Varies</p>
+  <details><summary>Where we saw it</summary><ul class="ex"><li dir="auto">Provider&#39;s accounts list is empty. (https://devv2ayn.dotcomlb.com/)</li></ul></details>
+</li>
+<li class="item sev-LOW">
+  <div class="top"><h3>Buttons with no readable name</h3><span class="count">7 buttons</span></div>
+  <p class="meta"><span class="tag sev">Low priority</span> <span class="tag plain">Detected by the scan</span></p>
+  <p><b>Why it matters.</b> Assistive technology cannot announce what the button does.</p>
+  <p><b>How to fix it.</b> </p>
+  <pre>&lt;button aria-label=&quot;Close menu&quot;&gt;…&lt;/button&gt;</pre>
+  <p class="effort">Effort: Small</p>
+  <details><summary>Where we saw it</summary><ul class="ex"><li dir="auto">&lt;button&gt;</li><li dir="auto">&lt;button&gt;</li><li dir="auto">&lt;button&gt;</li></ul><p class="effort">…and 4 more. The full list is in the data export.</p></details>
+</li>
+<li class="item sev-LOW">
+  <div class="top"><h3>Resources that failed to load</h3><span class="count">1 failed request</span></div>
+  <p class="meta"><span class="tag sev">Low priority</span> <span class="tag plain">Detected by the scan</span></p>
+  <p><b>Why it matters.</b> Some content, scripts, or sign-in options may not work for every visitor.</p>
+  <p><b>How to fix it.</b> Check each failing URL and its HTTP response, then remove or repair the reference.</p>
+  
+  <p class="effort">Effort: Small to medium</p>
+  <details><summary>Where we saw it</summary><ul class="ex"><li dir="auto">[GSI_LOGGER]: FedCM get() rejects with NetworkError: Error retrieving a token. (https://devv2ayn.dotcomlb.com/)</li></ul></details>
+</li></ol>
+
+<h2>Speed</h2>
+<p>Measured on one page load from our test browser. Treat these as a guide and compare over time.</p>
+<table><tr><td><b>Time to first byte</b><br><span class="effort">How long the server takes to start answering.</span></td><td class="num">3.5 s</td><td><span class="tag bad">Slow</span></td></tr><tr><td><b>First content shown</b><br><span class="effort">When visitors first see anything.</span></td><td class="num">4.9 s</td><td><span class="tag bad">Slow</span></td></tr><tr><td><b>Main content shown</b><br><span class="effort">When the largest element finishes loading.</span></td><td class="num">n/a</td><td><span class="tag na">Not measured</span></td></tr></table>
+
+<h2>What we checked</h2>
+<p>Everything below ran without changing anything on your site.</p>
+<ul class="checked"><li>827 page elements inspected (411 interactive)</li><li>80 links tested, none broken</li><li>20 user journeys run safely (5 passed)</li><li>Nothing was submitted, purchased, or signed in to</li></ul>
+
+<h2>For your development team</h2>
+<p>Lower-impact observations and automation notes. They do not affect visitors directly.</p>
+<ul class="notes"><li><b>Fragile automation locator</b>, 189 instances. Limited; documented so manual QA can provide a stable hook if the element matters.</li><li><b>Hidden interactive element</b>, 236 instances. Conditional controls are not automatable against the initial load.</li><li><b>Form control without an accessible label</b>, 1 instance. Could not be reproduced on the live page, so it is probably tied to menus or panels that are hidden by default.</li></ul>
+
+<footer>Generated by AI Website QA. Findings marked “Detected by the scan” are signals to review, not guaranteed defects.</footer>
+</main></body></html>

@@ -1,0 +1,21 @@
+[1mdiff --git a/src/scanner.ts b/src/scanner.ts[m
+[1mindex 58ea8a2..c2ffbc4 100644[m
+[1m--- a/src/scanner.ts[m
+[1m+++ b/src/scanner.ts[m
+[36m@@ -249,10 +249,14 @@[m [mexport async function scanPageInContext(context: BrowserContext, options: ScanOp[m
+       page.evaluate(() => ({[m
+         language: document.documentElement?.getAttribute("lang") ?? null,[m
+         viewport: document.querySelector('meta[name="viewport"]')?.getAttribute("content") ?? null,[m
+[32m+[m[32m        headings: Array.from(document.querySelectorAll("h1,h2,h3,h4,h5,h6")).map(node => ({[m
+[32m+[m[32m          level: Number(node.tagName.substring(1)),[m
+[32m+[m[32m          text: ((node as HTMLElement).textContent || "").trim().replace(/\s+/g, " ").slice(0, 120),[m
+[32m+[m[32m        })),[m
+       })),[m
+     ]);[m
+[31m-    const { language, viewport } = metadata;[m
+[31m-    const issues = detectIssues(elements, { title, lang: language, viewport });[m
+[32m+[m[32m    const { language, viewport, headings } = metadata;[m
+[32m+[m[32m    const issues = detectIssues(elements, { title, lang: language, viewport, headings });[m
+     const navigationStatus = response?.status();[m
+     if (navigationStatus === 401) issues.push({ status: "FAIL", code: "authentication-failed", message: "Navigation returned HTTP 401. HTTP Basic Authentication was not accepted or is not configured." });[m
+     else if (navigationStatus && navigationStatus >= 400) issues.push({ status: "FAIL", code: "page-http-error", message: `Page navigation returned HTTP ${navigationStatus}.` });[m
