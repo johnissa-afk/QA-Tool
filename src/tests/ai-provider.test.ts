@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import test from "node:test";
 import { analyzeScan } from "../ai/index.js";
-import { applyEnhancement, createAIProvider, DeterministicProvider, OpenAICompatibleProvider, validateEnhancement, validateTriageEntries } from "../ai/provider.js";
+import { applyEnhancement, createAIProvider, DeterministicProvider, OpenAICompatibleProvider, resolveAiApiUrl, validateEnhancement, validateTriageEntries } from "../ai/provider.js";
 import { buildFindings } from "../ai/analysis.js";
 import { decorateScenarios } from "../ai/scenarios.js";
 import { Confidence, QaFinding, Severity, VerificationResult } from "../ai/types.js";
@@ -452,4 +452,31 @@ test("enhance redacts scanner text before sending the deterministic draft", asyn
   } finally {
     await server.close();
   }
+});
+
+test("the AI key is only ever sent to a configured, safe destination", () => {
+  assert.deepEqual(resolveAiApiUrl(undefined), { url: "https://api.openai.com/v1/chat/completions" });
+  assert.deepEqual(resolveAiApiUrl("https://llm.example.test/v1/chat/completions"), { url: "https://llm.example.test/v1/chat/completions" });
+  for (const local of ["http://127.0.0.1:11434/v1/chat/completions", "http://localhost:8080/v1", "http://[::1]:8080/v1"]) {
+    assert.deepEqual(resolveAiApiUrl(local), { url: local }, `${local} is loopback`);
+  }
+  for (const unsafe of ["llm.example.test/v1/chat", "not a url", "http://llm.example.test/v1", "ftp://llm.example.test/x", "file:///etc/passwd"]) {
+    assert.ok("error" in resolveAiApiUrl(unsafe), `${unsafe} must be refused`);
+  }
+});
+
+test("a malformed AI_API_URL disables the AI provider instead of redirecting the key to the default host", () => {
+  const warnings: string[] = [];
+  const original = console.warn;
+  console.warn = (message?: unknown) => { warnings.push(String(message)); };
+  try {
+    const provider = createAIProvider({ AI_API_KEY: "sk-TEST-secret", AI_API_URL: "llm.example.test/v1/chat" } as NodeJS.ProcessEnv);
+    assert.equal(provider.apiKeyPresent, false, "no provider holds the key");
+    assert.equal(provider.name.includes("openai-compatible"), false);
+    assert.match(warnings.join("\n"), /AI provider disabled: AI_API_URL is not a valid URL/);
+    assert.ok(!warnings.join("\n").includes("sk-TEST-secret"), "the key is never printed");
+  } finally {
+    console.warn = original;
+  }
+  assert.throws(() => new OpenAICompatibleProvider("sk-TEST", "http://remote.example.test/v1"), /plain http/);
 });

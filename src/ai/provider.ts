@@ -54,6 +54,27 @@ export type ProviderFailureReason =
   | "no-change";
 
 /**
+ * Where the AI key may be sent. A missing value means the default host. A value that is not
+ * a valid URL, or that would send the key unencrypted to a remote host, is refused: falling
+ * back to the default host would hand a key issued by one provider to another (api.openai.com),
+ * and plain http would expose it on the network. http is accepted only for loopback addresses
+ * (local model servers and tests).
+ */
+export function resolveAiApiUrl(raw: string | undefined): { url: string } | { error: string } {
+  const trimmed = raw?.trim();
+  if (!trimmed) return { url: DEFAULT_API_URL };
+  let parsed: URL;
+  try { parsed = new URL(trimmed); } catch { return { error: "AI_API_URL is not a valid URL" }; }
+  if (parsed.protocol === "https:") return { url: trimmed };
+  if (parsed.protocol === "http:") {
+    const host = parsed.hostname.replace(/^\[|\]$/g, "");
+    if (host === "localhost" || host === "127.0.0.1" || host === "::1") return { url: trimmed };
+    return { error: "AI_API_URL uses plain http to a non-local host, which would send AI_API_KEY unencrypted" };
+  }
+  return { error: "AI_API_URL must be an https URL" };
+}
+
+/**
  * A well-formed response that simply had nothing to refine. This is NOT a
  * failure: the model worked, the schema matched, and the deterministic draft
  * was already good. It is kept distinct from `schema-invalid` so a healthy run
@@ -121,14 +142,10 @@ export class OpenAICompatibleProvider implements AIProvider {
     apiUrl?: string,
     model?: string,
   ) {
-    const trimmedUrl = apiUrl?.trim();
-    if (trimmedUrl && !/^https?:\/\//i.test(trimmedUrl)) {
-      // Never silently retarget the key at a different host than configured.
-      console.warn(`AI provider: AI_API_URL is not an http(s) URL; ignoring it and using ${DEFAULT_API_URL}.`);
-      this.apiUrl = DEFAULT_API_URL;
-    } else {
-      this.apiUrl = trimmedUrl || DEFAULT_API_URL;
-    }
+    const target = resolveAiApiUrl(apiUrl);
+    // Never send the key anywhere other than the configured, safe destination.
+    if ("error" in target) throw new Error(target.error);
+    this.apiUrl = target.url;
     this.model = model?.trim() || DEFAULT_MODEL;
     this.name = `${this.model} (openai-compatible)`;
   }
@@ -419,7 +436,13 @@ export class OpenAICompatibleProvider implements AIProvider {
 
 export function createAIProvider(env: NodeJS.ProcessEnv = process.env): AIProvider {
   const key = env.AI_API_KEY?.trim();
-  if (key) return new OpenAICompatibleProvider(key, env.AI_API_URL?.trim(), env.AI_MODEL?.trim());
+  if (key) {
+    try {
+      return new OpenAICompatibleProvider(key, env.AI_API_URL?.trim(), env.AI_MODEL?.trim());
+    } catch (error) {
+      console.warn(`AI provider disabled: ${error instanceof Error ? error.message : "invalid configuration"}. AI_API_KEY was not used; results are deterministic-only.`);
+    }
+  }
   return new DeterministicProvider();
 }
 
