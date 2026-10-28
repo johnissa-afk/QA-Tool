@@ -3,6 +3,7 @@ import { resolve, dirname } from "node:path";
 import { getAuthenticationConfig, scanWebsite } from "./scanner.js";
 import { emitGithubAnnotations, printJsonSummary, writeJUnitReport } from "./reporter.js";
 import { ReporterFormat, ScanOptions, WaitUntil } from "./types.js";
+import { assertSafeScanTarget } from "./url-policy.js";
 
 // Load project-local secrets before the scanner reads its authentication variables.
 // dotenv does not overwrite values already supplied by the calling environment.
@@ -90,7 +91,8 @@ export function parseArgs(args: string[]): ScanOptions | null {
   if (args.includes("--help") || args.includes("-h")) return null;
   const [url, ...rest] = args;
   if (!url || url.startsWith("-")) throw new Error(help);
-  new URL(url);
+  const allowPrivateNetwork = rest.includes("--allow-private-network");
+  const target = assertSafeScanTarget(url, allowPrivateNetwork);
   for (const name of ["--output", "--timeout", "--concurrency", "--perf-budgets", "--baseline-screenshot", "--screenshot-threshold"]) {
     const index = rest.indexOf(name);
     if (index >= 0 && (rest[index + 1] === undefined || rest[index + 1].startsWith("-"))) {
@@ -99,7 +101,7 @@ export function parseArgs(args: string[]): ScanOptions | null {
   }
   const option = (name: string, fallback: string) => rest.includes(name) ? (rest[rest.indexOf(name) + 1] ?? "") : fallback;
   const positive = (name: string, fallback: number) => { const value = Number(option(name, String(fallback))); if (!Number.isFinite(value) || value < 1) throw new Error(`${name} must be a positive number.`); return value; };
-  return { url: new URL(url).href, headed: rest.includes("--headed"), timeout: positive("--timeout", 30_000), outputPath: resolve(option("--output", "reports/qa-report.json")), concurrency: Math.floor(positive("--concurrency", 5)), retries: parseRetry(rest), waitUntil: parseWaitUntil(rest), throttleKbps: parseThrottle(rest), includePatterns: parseInclude(rest), excludePatterns: parseExclude(rest), followExternal: rest.includes("--follow-external"), reporter: parseReporter(rest), githubAnnotations: rest.includes("--github-annotations"), perfBudgetsPath: parsePerfBudgetsPath(rest), baselineScreenshotPath: parseBaselineScreenshotPath(rest), screenshotThreshold: parseScreenshotThreshold(rest) };
+  return { url: target.href, headed: rest.includes("--headed"), timeout: positive("--timeout", 30_000), outputPath: resolve(option("--output", "reports/qa-report.json")), concurrency: Math.floor(positive("--concurrency", 5)), retries: parseRetry(rest), waitUntil: parseWaitUntil(rest), throttleKbps: parseThrottle(rest), includePatterns: parseInclude(rest), excludePatterns: parseExclude(rest), followExternal: rest.includes("--follow-external"), allowPrivateNetwork, reporter: parseReporter(rest), githubAnnotations: rest.includes("--github-annotations"), perfBudgetsPath: parsePerfBudgetsPath(rest), baselineScreenshotPath: parseBaselineScreenshotPath(rest), screenshotThreshold: parseScreenshotThreshold(rest) };
 }
 
 async function main(): Promise<void> {

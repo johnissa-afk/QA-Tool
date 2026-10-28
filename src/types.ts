@@ -160,6 +160,8 @@ export type ScanOptions = {
   excludePatterns?: string;
   /** When true, external (cross-origin) links are also health-checked (default: false). */
   followExternal?: boolean;
+  /** Permit an intentional localhost/private-IP scan. CLI targets reject these by default. */
+  allowPrivateNetwork?: boolean;
   /** Output format for console + JUnit: "line" (default), "json", or "junit". */
   reporter?: ReporterFormat;
   /** When true, emit GitHub Actions workflow commands for inline annotations. */

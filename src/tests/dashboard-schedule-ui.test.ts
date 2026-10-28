@@ -12,6 +12,12 @@ const SITE = "https://example.com";
 // browser would actually receive.
 const APP_HTML = readFileSync(join(process.cwd(), "src", "dashboard", "app.html"), "utf8");
 
+test("a completed standalone run offers an explicit weekly scheduling opt-in", () => {
+  assert.match(APP_HTML, /Add to weekly scheduled sites/);
+  assert.match(APP_HTML, /frequency: "WEEKLY"/);
+  assert.match(APP_HTML, /function renderWeeklyScheduleOptIn/);
+});
+
 const analysis = () => ({
   schemaVersion: 1,
   generatedAt: "2026-09-29T10:00:00.000Z",

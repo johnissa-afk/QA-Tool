@@ -2,6 +2,16 @@
 
 AI Website QA is a dependency-light TypeScript and Playwright scanner for a quick, structured first pass over a web page. It discovers common UI elements, suggests Playwright locators, surfaces likely accessibility and QA risks, validates links, and produces JSON, HTML, and screenshot artifacts.
 
+## Quick start
+
+```powershell
+npm install
+npx playwright install chromium
+npm run qa -- https://example.com
+```
+
+That creates a deterministic JSON/HTML analysis in `reports/`. Add `--execute` to safely reproduce eligible findings, `--crawl` for same-origin flow discovery, and `--ci --baseline <path>` to enforce a regression gate. Targets on localhost or private IP ranges require an explicit `--allow-private-network` flag so an internal scan is always intentional.
+
 It is designed to inform test planning; a `WARNING` is a heuristic to investigate, not a definitive defect.
 
 **AI Website QA accepts arbitrary website URLs. NoorPlay is used only as a validation target.** No URL, page name, element id, selector, flow, or expected result is hard-coded; everything — pages, elements, navigation, forms, inputs, buttons, links, accessibility information, media, search, authentication indicators, language controls, likely user flows, and findings — is discovered dynamically from the scanned facts. A website requiring no authentication works with no credentials; HTTP Basic Auth uses the existing environment variables.
@@ -756,10 +766,14 @@ Tests in `src/tests/perf-budgets.test.ts` cover loud loading (missing/malformed/
 ## Development
 
 ```powershell
-npm run typecheck
-npm run build
+npm run lint          # TypeScript checks
+npm run format:check  # Prettier verification
 npm test
+npm run test:coverage # Node's built-in coverage summary
+npm run audit         # Fail on high/critical dependency advisories
 ```
+
+GitHub Actions runs the build and unit suite for every push and pull request. The existing manual QA gate remains available for an explicit URL and baseline. To enable weekday smoke scans, set the repository variable `QA_SMOKE_TARGET` to an approved public test URL.
 
 ## Project layout
 

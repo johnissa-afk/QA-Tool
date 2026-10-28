@@ -13,6 +13,10 @@
     "report": "tsx src/report-cli.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
+    "lint": "npm run typecheck",
+    "format:check": "prettier --check \"src/**/*.ts\" \"tools/**/*.{ts,js}\" \"*.{md,json,yml}\" \".github/**/*.yml\"",
+    "test:coverage": "npm run build && node --experimental-test-coverage --test \"dist/tests/*.test.js\"",
+    "audit": "npm audit --audit-level=high",
     "test": "npm run build && node --test \"dist/tests/*.test.js\"",
     "test:email-ui": "tsx tools/email-settings-browser.ts",
     "test:notification-email": "tsx tools/notification-email-browser.ts"
@@ -28,6 +32,7 @@
     "@playwright/test": "^1.63.0",
     "@types/node": "^26.5.1",
     "playwright": "^1.63.0",
+    "prettier": "^3.9.10",
     "tsx": "^4.23.13",
     "typescript": "^7.0.2"
   },

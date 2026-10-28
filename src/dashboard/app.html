@@ -793,6 +793,11 @@ function renderResult(results, run, changes, projectId, whatChanged) {
   if (!panel) return;
   panel.appendChild(renderNav(results, Boolean(changes), Boolean(whatChanged)));
   panel.appendChild(renderOverview(results, run));
+  // A one-off run has no project record, so it would otherwise have no route
+  // into the persistent scheduler. Make scheduling an explicit opt-in only
+  // after a real result exists; project runs already expose the same controls
+  // on their project page.
+  if (!projectId) panel.appendChild(renderWeeklyScheduleOptIn(run));
   // What Changed is the primary cross-dimension section for a project run, and
   // sits directly under the overview. It carries its own availability, so a
   // standalone run or an uncomparable pair shows the exact reason instead of a
@@ -1716,6 +1721,59 @@ const apiJson = async (path, options) => {
 };
 
 const NOT_AVAILABLE = "not available";
+
+/**
+ * Turns a completed one-off run into a saved project with a WEEKLY schedule.
+ * This intentionally uses the existing project and schedule APIs in sequence:
+ * a schedule can never point at an unsaved URL, and a failed schedule write is
+ * reported honestly while retaining the project the user explicitly chose to
+ * create. Nothing is scheduled until the user presses this button.
+ */
+function renderWeeklyScheduleOptIn(run) {
+  const shell = card("Schedule this site");
+  const url = typeof run?.url === "string" ? run.url : "";
+  if (!url) {
+    shell.appendChild(el("p", "muted", "This run has no saved URL, so it cannot be added to a recurring schedule."));
+    return shell;
+  }
+  shell.appendChild(el("p", "lede", "Want to test this website again every week? Save this completed one-off run as a project and enable a weekly schedule."));
+  const actions = el("div", "links");
+  const add = el("button", "btn", "Add to weekly scheduled sites");
+  add.type = "button";
+  add.addEventListener("click", async () => {
+    let suggested = "Website";
+    try { suggested = new URL(url).hostname || suggested; } catch { /* server validates the URL */ }
+    const name = window.prompt("Name for this scheduled website", suggested);
+    if (name === null) return;
+    add.disabled = true;
+    add.textContent = "Saving…";
+    const created = await apiJson("/api/projects", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, url }),
+    });
+    if (!created.ok) {
+      add.disabled = false;
+      add.textContent = "Add to weekly scheduled sites";
+      window.alert((created.body && created.body.error) || "Could not save this website. If it is already a project, open it from Projects to manage its schedule.");
+      return;
+    }
+    const project = created.body.project;
+    const timezone = browserTimezones()[0] || "UTC";
+    const scheduled = await apiJson(schedulePath(project.id), {
+      method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ enabled: true, frequency: "WEEKLY", timezone }),
+    });
+    if (!scheduled.ok) {
+      add.disabled = false;
+      add.textContent = "Add to weekly scheduled sites";
+      window.alert("The website was saved, but its weekly schedule could not be enabled. Open the project to finish configuring it.");
+      navigate("/projects/" + encodeURIComponent(project.id));
+      return;
+    }
+    navigate("/projects/" + encodeURIComponent(project.id));
+  });
+  actions.appendChild(add);
+  shell.appendChild(actions);
+  return shell;
+}
 
 async function renderProjectsPage(mount) {
   const create = card("Create Project");

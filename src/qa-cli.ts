@@ -52,6 +52,7 @@ import { createStageEventEmitter, QaStage, QaStageEmitter, STAGE_EVENT_FILENAME 
 import { atomicWriteText } from "./atomic-write.js";
 import { DashboardOptions, serveUntilClosed } from "./dashboard/server.js";
 import { MAX_CONCURRENT_RUNS_LIMIT } from "./dashboard/run-manager.js";
+import { assertSafeScanTarget } from "./url-policy.js";
 
 // `.env` is documented as the local configuration source (README, .env.example)
 // and `src/cli.ts` loads it the same way. Without this call every QA_* / AI_* /
@@ -261,6 +262,7 @@ export type QaOptions = {
   headed: boolean;
   timeout: number;
   concurrency: number;
+  allowPrivateNetwork: boolean;
   crawl: boolean;
   maxPages: number;
   maxDepth: number;
@@ -323,6 +325,8 @@ export function parseArgs(args: string[], config: QaConfig = {}): QaOptions | nu
     if (index >= 0 && (always || (args[index + 1] !== undefined && !args[index + 1].startsWith("-")))) consumed.add(index + 1);
   }
   const url = args.find((value, index) => !value.startsWith("-") && !consumed.has(index)) ?? null;
+  const allowPrivateNetwork = args.includes("--allow-private-network");
+  if (url) assertSafeScanTarget(url, allowPrivateNetwork);
   const reportPath = optionValue(args, "--report", "") || null;
   const suitePath = optionValue(args, "--suite", "") || null;
   const outputPath = resolve(optionValue(args, "--output", "reports/qa-analysis.json"));
@@ -412,7 +416,7 @@ export function parseArgs(args: string[], config: QaConfig = {}): QaOptions | nu
   }
 
   return {
-    url, reportPath, suitePath, outputPath, execute, headed, timeout, concurrency, crawl, maxPages, maxDepth, maxFlows, maxFlowSteps, baselinePath, writeBaselinePath, baselineMaxAge, baselineMaxAgeMs, historyDir, resetHistory: resetHistoryFlag, ci, failOn, perfBudgetsPath,
+    url, reportPath, suitePath, outputPath, execute, headed, timeout, concurrency, allowPrivateNetwork, crawl, maxPages, maxDepth, maxFlows, maxFlowSteps, baselinePath, writeBaselinePath, baselineMaxAge, baselineMaxAgeMs, historyDir, resetHistory: resetHistoryFlag, ci, failOn, perfBudgetsPath,
     gateMinSeverity: resolved.gateMinSeverity,
     coverage: resolved.coverage,
     regression: resolved.regression,
@@ -691,7 +695,7 @@ export async function main(): Promise<void> {
   } else {
     if (!options.url) throw new Error("A URL is required.");
     startStage("scan");
-    const scanned = await scanWebsite({ url: options.url, headed: options.headed, timeout: options.timeout, outputPath: "reports/qa-report.json", concurrency: options.concurrency });
+    const scanned = await scanWebsite({ url: options.url, headed: options.headed, timeout: options.timeout, outputPath: "reports/qa-report.json", concurrency: options.concurrency, allowPrivateNetwork: options.allowPrivateNetwork });
     report = scanned.report;
     reportPathForSuite = scanned.jsonPath;
     completeStage("scan");

@@ -60,6 +60,13 @@ test("CLI parses URL filtering flags with defaults", () => {
   assert.equal(result?.includePatterns, undefined);
   assert.equal(result?.excludePatterns, undefined);
   assert.equal(result?.followExternal, false);
+  assert.equal(result?.allowPrivateNetwork, false);
+});
+
+test("CLI rejects private targets unless explicitly authorized", () => {
+  assert.throws(() => parseArgs(["http://127.0.0.1:3000"]), /Refusing private-network target/);
+  assert.equal(parseArgs(["http://127.0.0.1:3000", "--allow-private-network"])?.allowPrivateNetwork, true);
+  assert.throws(() => parseArgs(["file:///C:/secret.html"]), /http:\/\/ or https:\/\//);
 });
 
 test("CLI parses URL filtering flags when provided", () => {
