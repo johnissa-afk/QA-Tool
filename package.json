@@ -33,7 +33,7 @@
     "@types/node": "^26.5.1",
     "playwright": "^1.63.0",
     "prettier": "^3.9.10",
-    "tsx": "^4.23.13",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   },
   "dependencies": {
