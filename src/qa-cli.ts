@@ -319,6 +319,24 @@ export function parseArgs(args: string[], config: QaConfig = {}): QaOptions | nu
     ["--max-pages", true], ["--max-depth", true], ["--max-flows", true], ["--max-flow-steps", true], ["--execute", false],
     ["--fail-on", true], ["--perf-budgets", true],
   ];
+    // Validate required option values before URL detection.
+  // Otherwise a following option (e.g. --execute) can be consumed
+  // as the missing value and the next token can be mistaken for a URL.
+  for (const [name, requiresValue] of valueOptions) {
+    if (!requiresValue) continue;
+
+    const index = args.indexOf(name);
+    if (index >= 0 && (
+      args[index + 1] === undefined ||
+      args[index + 1].startsWith("-")
+    )) {
+      throw new Error(
+        `${name} requires a value (a file path or argument), got ${
+          args[index + 1] === undefined ? "(missing)" : args[index + 1]
+        }.`
+      );
+    }
+  }
   const consumed = new Set<number>();
   for (const [name, always] of valueOptions) {
     const index = args.indexOf(name);
